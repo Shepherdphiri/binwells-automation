@@ -1,0 +1,8 @@
+{
+  "name": "Binwells Automation & Security",
+  "description": "Cape Town gate & garage automation, electric fencing, CCTV surveillance, and steel fabrication with real-time live news feed and admin console.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

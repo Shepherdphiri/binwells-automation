@@ -1,0 +1,467 @@
+import {FormEvent, useEffect, useState} from 'react';
+import {CheckCircle2, ExternalLink, Mail, MapPin, Phone, ShieldAlert} from 'lucide-react';
+import type {BrandSettings, ServiceItem} from '../types.ts';
+
+interface QuoteSectionProps {
+  brand: BrandSettings;
+  services: ServiceItem[];
+  selectedServiceId: string;
+  onSelectServiceId: (id: string) => void;
+}
+
+export function QuoteSection({
+  brand,
+  services,
+  selectedServiceId,
+  onSelectServiceId,
+}: QuoteSectionProps) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [suburb, setSuburb] = useState('');
+  const [propertyType, setPropertyType] = useState<'Residential' | 'Commercial' | 'Industrial'>('Residential');
+  const [requestType, setRequestType] = useState<'New Installation' | 'Repair & Maintenance'>('New Installation');
+  const [confirmCalloutFee, setConfirmCalloutFee] = useState(true);
+  const [confirmWarranty, setConfirmWarranty] = useState(true);
+  const [confirmScope, setConfirmScope] = useState(true);
+  const [details, setDetails] = useState('');
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submittedRef, setSubmittedRef] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedServiceId && services.length > 0) {
+      onSelectServiceId(services[0].id);
+    }
+  }, [selectedServiceId, services, onSelectServiceId]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSubmitError(null);
+    setSubmittedRef(null);
+
+    if (name.trim().length < 2) {
+      setSubmitError('Please enter your full name.');
+      return;
+    }
+    if (phone.trim().length < 7) {
+      setSubmitError('Please provide a valid phone or WhatsApp number.');
+      return;
+    }
+    if (!suburb.trim()) {
+      setSubmitError('Please enter your Cape Town suburb.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const matched = services.find((s) => s.id === selectedServiceId);
+      const res = await fetch('/api/inquiries', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          suburb: suburb.trim(),
+          propertyType,
+          requestType,
+          serviceId: selectedServiceId,
+          serviceTitle: matched?.title || 'General Inquiry',
+          confirmCalloutFee,
+          confirmWarranty,
+          confirmScope,
+          details: details.trim(),
+        }),
+      });
+      const data = (await res.json()) as {id?: string; error?: string};
+      if (!res.ok) {
+        throw new Error(data.error || 'Could not submit your inquiry.');
+      }
+      setSubmittedRef(data.id || 'Submitted');
+      setName('');
+      setPhone('');
+      setEmail('');
+      setSuburb('');
+      setDetails('');
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Network error submitting inquiry.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section id="contact" className="py-20 bg-white border-t border-slate-200">
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+          {/* Left Column: Cape Town Locations, Direct Phones & Transparency */}
+          <div className="lg:col-span-5 space-y-8">
+            <div>
+              <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
+                {brand.contactPageEyebrow}
+              </p>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 text-balance">
+                {brand.contactPageTitle}
+              </h2>
+              <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed">
+                {brand.contactPageSubtitle}
+              </p>
+            </div>
+
+            <div className="border-t border-slate-200 pt-6 space-y-5">
+              <div className="group flex items-start gap-3">
+                <Phone
+                  className="w-5 h-5 text-slate-700 mt-0.5 shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110 group-hover:-rotate-6 group-hover:text-amber-700"
+                  aria-hidden="true"
+                />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Direct Telephone Lines</h3>
+                  <div className="mt-1.5 flex flex-col gap-1 font-mono text-sm tabular-nums text-slate-800">
+                    <a
+                      href={`tel:${brand.primaryPhone.replace(/\s+/g, '')}`}
+                      className="hover:text-amber-700 transition-colors w-fit"
+                    >
+                      {brand.primaryPhone}
+                    </a>
+                    {brand.secondaryPhone && (
+                      <a
+                        href={`tel:${brand.secondaryPhone.replace(/\s+/g, '')}`}
+                        className="text-slate-600 hover:text-amber-700 transition-colors w-fit"
+                      >
+                        {brand.secondaryPhone}{' '}
+                        <span className="font-sans text-xs text-slate-500">
+                          (Alternate / Local Promo Line)
+                        </span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {brand.contactEmail && (
+                <div className="group flex items-start gap-3">
+                  <Mail
+                    className="w-5 h-5 text-slate-700 mt-0.5 shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110 group-hover:text-amber-700"
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">Business Email</h3>
+                    <a
+                      href={`mailto:${brand.contactEmail}`}
+                      className="mt-1 inline-block text-sm font-mono text-slate-800 hover:text-amber-700 transition-colors"
+                    >
+                      {brand.contactEmail}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              <div className="group flex items-start gap-3">
+                <MapPin
+                  className="w-5 h-5 text-slate-700 mt-0.5 shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-0.5 group-hover:text-amber-700"
+                  aria-hidden="true"
+                />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Listed Cape Town Addresses</h3>
+                  <ul className="mt-1.5 space-y-2 text-sm text-slate-700">
+                    <li>
+                      <span className="font-medium text-slate-900">Bishopscourt:</span>{' '}
+                      {brand.bishopscourtAddress}
+                    </li>
+                    <li>
+                      <span className="font-medium text-slate-900">Retreat:</span>{' '}
+                      {brand.retreatAddress}
+                      <span className="block text-xs text-slate-500 mt-0.5">
+                        {brand.retreatNote}
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="group flex items-start gap-3">
+                <ExternalLink
+                  className="w-5 h-5 text-slate-700 mt-0.5 shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-amber-700"
+                  aria-hidden="true"
+                />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Online Presence</h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Listed on Facebook as{' '}
+                    <a
+                      href={brand.facebookUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-4 hover:decoration-amber-600"
+                    >
+                      {brand.facebookPageName}
+                    </a>{' '}
+                    and local Cape Town service directories under {brand.companyName}.
+                  </p>
+                  <p className="mt-1.5 text-xs text-slate-500">{brand.operatingHours}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Upfront Scope, Warranty & Public Listing Transparency Box */}
+            <div className="group rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="flex items-start gap-3">
+                <ShieldAlert
+                  className="w-5 h-5 text-amber-700 mt-0.5 shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
+                  aria-hidden="true"
+                />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Confirm Scope, Warranty &amp; Call-Out Fees Upfront
+                  </h3>
+                  <p className="mt-1.5 text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    {brand.transparencyNote}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Interactive Quote & Repair Request Form */}
+          <div id="quote" className="lg:col-span-7">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 sm:p-8">
+              <div className="mb-6">
+                <h3 className="text-xl font-bold tracking-tight text-slate-900">
+                  Request a Site Quote or Repair Assessment
+                </h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Send your property details and upfront confirmation questions directly to our dispatch desk.
+                </p>
+              </div>
+
+              {submittedRef ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-700 mt-0.5 shrink-0" aria-hidden="true" />
+                    <div>
+                      <h4 className="text-base font-semibold text-emerald-950">
+                        Inquiry Received ({submittedRef})
+                      </h4>
+                      <p className="mt-1 text-sm text-emerald-900">
+                        Your request has been logged in real time with our dispatch team. For urgent gate
+                        or alarm faults, call{' '}
+                        <span className="font-mono font-semibold tabular-nums">{brand.primaryPhone}</span>.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setSubmittedRef(null)}
+                        className="mt-4 px-4 py-2 text-xs font-medium text-emerald-950 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        Submit Another Request
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+                  {/* Request Type Segmented Control */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Work Required
+                      </label>
+                      <div className="grid grid-cols-2 gap-1 p-1 bg-slate-200/70 rounded-lg">
+                        {(['New Installation', 'Repair & Maintenance'] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setRequestType(mode)}
+                            className={`px-3 py-2 text-xs font-medium rounded-md transition-colors cursor-pointer truncate ${
+                              requestType === mode
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            {mode === 'New Installation' ? 'New Install' : 'Repair / Fault'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Property Type
+                      </label>
+                      <div className="grid grid-cols-3 gap-1 p-1 bg-slate-200/70 rounded-lg">
+                        {(['Residential', 'Commercial', 'Industrial'] as const).map((prop) => (
+                          <button
+                            key={prop}
+                            type="button"
+                            onClick={() => setPropertyType(prop)}
+                            className={`px-2 py-2 text-xs font-medium rounded-md transition-colors cursor-pointer truncate ${
+                              propertyType === prop
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            {prop}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="quote-name" className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Your Name *
+                      </label>
+                      <input
+                        id="quote-name"
+                        type="text"
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Thabo Mokoena"
+                        className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="quote-phone" className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Phone / WhatsApp Number *
+                      </label>
+                      <input
+                        id="quote-phone"
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+27 82 000 0000"
+                        className="w-full px-3.5 py-2.5 text-sm font-mono tabular-nums bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="quote-suburb" className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Cape Town Suburb *
+                      </label>
+                      <input
+                        id="quote-suburb"
+                        type="text"
+                        required
+                        value={suburb}
+                        onChange={(e) => setSuburb(e.target.value)}
+                        placeholder="e.g. Bishopscourt, Retreat, Claremont"
+                        className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="quote-email" className="block text-xs font-medium text-slate-700 mb-1.5">
+                        Email Address (Optional)
+                      </label>
+                      <input
+                        id="quote-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="name@example.co.za"
+                        className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="quote-service" className="block text-xs font-medium text-slate-700 mb-1.5">
+                      Service Category
+                    </label>
+                    <select
+                      id="quote-service"
+                      value={selectedServiceId}
+                      onChange={(e) => onSelectServiceId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600"
+                    >
+                      {services
+                        .filter((s) => s.active)
+                        .map((srv) => (
+                          <option key={srv.id} value={srv.id}>
+                            {srv.title}
+                          </option>
+                        ))}
+                      <option value="general">Other / Combined Security Package</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="quote-details" className="block text-xs font-medium text-slate-700 mb-1.5">
+                      System Details or Fault Description
+                    </label>
+                    <textarea
+                      id="quote-details"
+                      rows={3}
+                      value={details}
+                      onChange={(e) => setDetails(e.target.value)}
+                      placeholder="Describe gate motor model, fence length, number of cameras, or fault symptoms..."
+                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600"
+                    />
+                  </div>
+
+                  {/* Pre-dispatch clarity checkboxes */}
+                  <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-2.5">
+                    <p className="text-xs font-semibold text-slate-800">
+                      Include Written Confirmation Requests:
+                    </p>
+                    <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={confirmCalloutFee}
+                        onChange={(e) => setConfirmCalloutFee(e.target.checked)}
+                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-600"
+                      />
+                      Confirm call-out / diagnostic fee before technician dispatch
+                    </label>
+                    <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={confirmWarranty}
+                        onChange={(e) => setConfirmWarranty(e.target.checked)}
+                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-600"
+                      />
+                      Confirm manufacturer vs. workmanship warranty terms
+                    </label>
+                    <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={confirmScope}
+                        onChange={(e) => setConfirmScope(e.target.checked)}
+                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-600"
+                      />
+                      Provide itemized scope of work and lead time upfront
+                    </label>
+                  </div>
+
+                  {submitError && (
+                    <p role="alert" className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
+                      {submitError}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="px-6 py-3 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                    >
+                      {submitting ? 'Submitting Request...' : 'Send Quote Request'}
+                    </button>
+                    <span className="text-xs text-slate-500">
+                      Or call <span className="font-mono tabular-nums text-slate-700">{brand.primaryPhone}</span>
+                    </span>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
