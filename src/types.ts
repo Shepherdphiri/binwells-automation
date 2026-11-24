@@ -10,6 +10,8 @@ export interface BrandSettings {
   heroTitle: string;
   heroSubtitle: string;
   heroImageUrl: string;
+  heroImages: string[];
+  heroImageOpacity: number;
   typewriterPhrases: string[];
   logoUrl: string;
   primaryPhone: string;

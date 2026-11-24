@@ -8,6 +8,7 @@ import {
   MapPin,
   Menu,
   Phone,
+  Search,
   Shield,
   ShieldCheck,
   Wrench,
@@ -17,10 +18,12 @@ import {
 import {AdminConsole} from './components/AdminConsole.tsx';
 import {BrandMark} from './components/BrandMark.tsx';
 import {FaqAccordion} from './components/FaqAccordion.tsx';
+import {NavSearch} from './components/NavSearch.tsx';
 import {QuoteSection} from './components/QuoteSection.tsx';
 import {ResilientImage} from './components/ResilientImage.tsx';
 import {TypewriterText} from './components/TypewriterText.tsx';
 import {useRealtimeSite} from './hooks/useRealtimeSite.ts';
+import {getHeroOpacityClass} from './utils/heroOpacity.ts';
 import type {GalleryImage, QuoteInquiry} from './types.ts';
 
 type PageRoute = 'home' | 'services' | 'about' | 'contact' | 'admin';
@@ -50,10 +53,13 @@ export default function App() {
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [inquiries, setInquiries] = useState<QuoteInquiry[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
+  const [focusedFaqId, setFocusedFaqId] = useState<string | null>(null);
   const [galleryFilter, setGalleryFilter] = useState<string>('All');
   const [showAllHomeGallery, setShowAllHomeGallery] = useState(false);
+  const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [lightboxImage, setLightboxImage] = useState<GalleryImage | null>(null);
 
   const handleIncomingInquiry = useCallback((inq: QuoteInquiry) => {
@@ -81,6 +87,7 @@ export default function App() {
       if (e.key === 'Escape') {
         setLightboxImage(null);
         setMobileMenuOpen(false);
+        setMobileSearchOpen(false);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -90,11 +97,12 @@ export default function App() {
   const navigateTo = (target: PageRoute, scrollToId?: string) => {
     setPage(target);
     setMobileMenuOpen(false);
+    setMobileSearchOpen(false);
     window.location.hash = target;
     if (scrollToId) {
       window.setTimeout(() => {
-        document.getElementById(scrollToId)?.scrollIntoView({behavior: 'smooth'});
-      }, 60);
+        document.getElementById(scrollToId)?.scrollIntoView({behavior: shouldReduceMotion ? 'auto' : 'smooth'});
+      }, 90);
     } else {
       window.scrollTo({top: 0, behavior: shouldReduceMotion ? 'auto' : 'smooth'});
     }
@@ -125,6 +133,29 @@ export default function App() {
     if (galleryFilter === 'All') return siteState.gallery;
     return siteState.gallery.filter((g) => g.category === galleryFilter);
   }, [siteState, galleryFilter]);
+
+  const heroSlides = useMemo(() => {
+    if (!siteState) return [];
+    const raw =
+      Array.isArray(siteState.brand.heroImages) && siteState.brand.heroImages.length > 0
+        ? siteState.brand.heroImages
+        : [siteState.brand.heroImageUrl];
+    return Array.from(new Set(raw.filter(Boolean)));
+  }, [siteState]);
+
+  useEffect(() => {
+    if (heroSlideIndex >= heroSlides.length) {
+      setHeroSlideIndex(0);
+    }
+  }, [heroSlideIndex, heroSlides.length]);
+
+  useEffect(() => {
+    if (heroSlides.length <= 1 || shouldReduceMotion) return;
+    const timer = window.setInterval(() => {
+      setHeroSlideIndex((prev) => (prev + 1) % heroSlides.length);
+    }, 5500);
+    return () => window.clearInterval(timer);
+  }, [heroSlides.length, shouldReduceMotion]);
 
   if (!siteState) {
     return (
@@ -176,7 +207,7 @@ export default function App() {
             className="flex items-center gap-2.5 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 rounded-md"
           >
             <BrandMark logoUrl={brand.logoUrl} companyName={brand.companyName} sizeClass="w-8 h-8" />
-            <span className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 truncate max-w-[210px] sm:max-w-none">
+            <span className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 truncate max-w-[210px] sm:max-w-[300px] lg:max-w-[250px] xl:max-w-none">
               {brand.companyName}
             </span>
           </a>
@@ -214,8 +245,29 @@ export default function App() {
             })}
           </nav>
 
-          {/* Zone 3: 1 Primary CTA + Mobile Menu Toggle */}
+          {/* Zone 3: Search Bar + 1 Primary CTA + Mobile Toggles */}
           <div className="flex items-center gap-3 shrink-0">
+            <NavSearch
+              siteState={siteState}
+              onNavigate={(route, scrollId) => navigateTo(route, scrollId)}
+              onSelectFaq={(faqId) => {
+                setFocusedFaqId(faqId);
+                navigateTo('about', 'faq-section');
+              }}
+              onOpenImage={(img) => setLightboxImage(img)}
+              className="hidden xl:block w-56 2xl:w-64"
+            />
+            <button
+              type="button"
+              aria-label={mobileSearchOpen ? 'Close site search' : 'Search website'}
+              onClick={() => {
+                setMobileSearchOpen((prev) => !prev);
+                setMobileMenuOpen(false);
+              }}
+              className="xl:hidden p-2 text-slate-700 hover:text-slate-900 border border-slate-200 rounded-lg cursor-pointer"
+            >
+              {mobileSearchOpen ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
+            </button>
             <button
               type="button"
               onClick={() => navigateTo('contact', 'quote')}
@@ -230,7 +282,10 @@ export default function App() {
             <button
               type="button"
               aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              onClick={() => {
+                setMobileMenuOpen((prev) => !prev);
+                setMobileSearchOpen(false);
+              }}
               className="lg:hidden p-2 text-slate-700 hover:text-slate-900 border border-slate-200 rounded-lg cursor-pointer"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -238,21 +293,52 @@ export default function App() {
           </div>
         </div>
 
+        {/* Expandable Search Bar for Tablet / Mobile (< xl) */}
+        {mobileSearchOpen && (
+          <div className="xl:hidden border-t border-slate-200 bg-white px-6 sm:px-10 py-3">
+            <NavSearch
+              siteState={siteState}
+              onNavigate={(route, scrollId) => navigateTo(route, scrollId)}
+              onSelectFaq={(faqId) => {
+                setFocusedFaqId(faqId);
+                navigateTo('about', 'faq-section');
+              }}
+              onOpenImage={(img) => setLightboxImage(img)}
+              autoFocus
+              onResultChosen={() => setMobileSearchOpen(false)}
+              className="w-full"
+            />
+          </div>
+        )}
+
         {/* Mobile Drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-slate-200 bg-white px-6 py-4 space-y-2">
-            {navItems.map((item) => (
-              <button
-                key={item.route}
-                type="button"
-                onClick={() => navigateTo(item.route)}
-                className={`block w-full text-left py-2 text-xs font-semibold tracking-wide cursor-pointer ${
-                  page === item.route ? 'text-amber-700' : 'text-slate-800 hover:text-slate-950'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className="lg:hidden border-t border-slate-200 bg-white px-6 py-4 space-y-3">
+            <NavSearch
+              siteState={siteState}
+              onNavigate={(route, scrollId) => navigateTo(route, scrollId)}
+              onSelectFaq={(faqId) => {
+                setFocusedFaqId(faqId);
+                navigateTo('about', 'faq-section');
+              }}
+              onOpenImage={(img) => setLightboxImage(img)}
+              onResultChosen={() => setMobileMenuOpen(false)}
+              className="w-full"
+            />
+            <div className="space-y-1">
+              {navItems.map((item) => (
+                <button
+                  key={item.route}
+                  type="button"
+                  onClick={() => navigateTo(item.route)}
+                  className={`block w-full text-left py-2 text-xs font-semibold tracking-wide cursor-pointer ${
+                    page === item.route ? 'text-amber-700' : 'text-slate-800 hover:text-slate-950'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               onClick={() => navigateTo('contact', 'quote')}
@@ -296,41 +382,49 @@ export default function App() {
             transition={{duration: 0.18}}
             className="flex-1"
           >
-            {/* Animated Hero Section */}
+            {/* Animated Hero Section with Background Carousel & Adjustable Opacity */}
             <section className="relative overflow-hidden bg-slate-950 text-white">
-              <motion.div
+              <div
                 aria-hidden="true"
-                className="absolute inset-0"
-                initial={shouldReduceMotion ? false : {scale: 1.04}}
-                animate={
-                  shouldReduceMotion
-                    ? {scale: 1}
-                    : {
-                        scale: [1.02, 1.07, 1.02],
-                      }
-                }
-                transition={{
-                  duration: 24,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
+                className={`absolute inset-0 transition-opacity duration-300 ${getHeroOpacityClass(
+                  brand.heroImageOpacity,
+                )}`}
               >
-                <ResilientImage
-                  src={brand.heroImageUrl}
-                  alt="Automated driveway sliding gate in Cape Town"
-                  fallbackLabel={brand.companyName}
-                  eager
-                  className="w-full h-full object-cover opacity-55"
-                />
-              </motion.div>
+                <AnimatePresence initial={false} mode="sync">
+                  {heroSlides.length > 0 && (
+                    <motion.div
+                      key={heroSlides[heroSlideIndex % heroSlides.length]}
+                      className="absolute inset-0"
+                      initial={shouldReduceMotion ? false : {opacity: 0, scale: 1.04}}
+                      animate={{
+                        opacity: 1,
+                        scale: shouldReduceMotion ? 1 : [1.02, 1.07],
+                      }}
+                      exit={shouldReduceMotion ? undefined : {opacity: 0}}
+                      transition={{
+                        opacity: {duration: 1.0, ease: 'easeInOut'},
+                        scale: {duration: 12, ease: 'easeOut'},
+                      }}
+                    >
+                      <ResilientImage
+                        src={heroSlides[heroSlideIndex % heroSlides.length]}
+                        alt={`${brand.companyName} installation showcase ${heroSlideIndex + 1}`}
+                        fallbackLabel={brand.companyName}
+                        eager
+                        className="w-full h-full object-cover"
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               <div
                 aria-hidden="true"
-                className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/75 to-slate-950/60"
+                className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/50 to-slate-950/20"
               />
               <div
                 aria-hidden="true"
-                className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-slate-950/35"
+                className="absolute inset-0 bg-gradient-to-t from-slate-950/65 via-transparent to-slate-950/20"
               />
 
               <div className="relative z-10 w-full px-6 sm:px-10 lg:px-14 xl:px-16 py-24 sm:py-28 lg:py-36">
@@ -386,6 +480,29 @@ export default function App() {
                   </div>
                 </motion.div>
               </div>
+
+              {heroSlides.length > 1 && (
+                <div
+                  aria-label="Hero background slide selector"
+                  className="relative z-20 px-6 sm:px-10 lg:px-14 xl:px-16 pb-6 flex items-center justify-end gap-2"
+                >
+                  {heroSlides.map((slideUrl, idx) => {
+                    const active = idx === heroSlideIndex % heroSlides.length;
+                    return (
+                      <button
+                        key={slideUrl}
+                        type="button"
+                        aria-label={`Show hero background ${idx + 1} of ${heroSlides.length}`}
+                        aria-pressed={active}
+                        onClick={() => setHeroSlideIndex(idx)}
+                        className={`h-1.5 rounded-full transition-all duration-200 cursor-pointer ${
+                          active ? 'w-8 bg-amber-400' : 'w-4 bg-white/40 hover:bg-white/75'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </section>
 
             {/* Recent Completed Work (Immediately Below Hero) */}
@@ -683,8 +800,9 @@ export default function App() {
                   const isWide = srv.featured || (activeServices.length % 2 === 1 && idx === 0);
                   return (
                     <article
+                      id={`service-${srv.id}`}
                       key={srv.id}
-                      className={`group ${
+                      className={`group scroll-mt-20 ${
                         isWide ? 'lg:col-span-7' : 'lg:col-span-5'
                       } bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col justify-between`}
                     >
@@ -830,6 +948,7 @@ export default function App() {
                 {/* Frequently Asked Questions */}
                 <FaqAccordion
                   faqs={siteState.faqs}
+                  focusedFaqId={focusedFaqId}
                   onRequestQuote={() => navigateTo('contact', 'quote')}
                 />
 

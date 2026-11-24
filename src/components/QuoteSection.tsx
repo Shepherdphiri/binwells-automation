@@ -1,5 +1,5 @@
-import {FormEvent, useEffect, useState} from 'react';
-import {CheckCircle2, ExternalLink, Mail, MapPin, Phone, ShieldAlert} from 'lucide-react';
+import {FormEvent, useEffect, useRef, useState} from 'react';
+import {CheckCircle2, ExternalLink, Mail, MapPin, MessageCircle, Phone, ShieldAlert} from 'lucide-react';
 import type {BrandSettings, ServiceItem} from '../types.ts';
 
 interface QuoteSectionProps {
@@ -9,12 +9,27 @@ interface QuoteSectionProps {
   onSelectServiceId: (id: string) => void;
 }
 
+function buildPrefilledDetails(
+  serviceTitle: string,
+  requestType: 'New Installation' | 'Repair & Maintenance',
+  propertyType: 'Residential' | 'Commercial' | 'Industrial',
+) {
+  const workLabel = requestType === 'New Installation' ? 'a new installation' : 'a repair / fault assessment';
+  return `Hi, I would like a quote for ${workLabel} under ${serviceTitle} for a ${propertyType.toLowerCase()} property. Please advise on availability and pricing.`;
+}
+
+function formatWhatsAppDigits(rawPhone: string): string {
+  const digits = rawPhone.replace(/\D/g, '');
+  return digits.startsWith('0') ? `27${digits.slice(1)}` : digits;
+}
+
 export function QuoteSection({
   brand,
   services,
   selectedServiceId,
   onSelectServiceId,
 }: QuoteSectionProps) {
+  const waAnchorRef = useRef<HTMLAnchorElement | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -25,16 +40,60 @@ export function QuoteSection({
   const [confirmWarranty, setConfirmWarranty] = useState(true);
   const [confirmScope, setConfirmScope] = useState(true);
   const [details, setDetails] = useState('');
+  const [detailsEdited, setDetailsEdited] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedRef, setSubmittedRef] = useState<string | null>(null);
+  const [lastWhatsAppUrl, setLastWhatsAppUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedServiceId && services.length > 0) {
       onSelectServiceId(services[0].id);
     }
   }, [selectedServiceId, services, onSelectServiceId]);
+
+  const matchedService = services.find((s) => s.id === selectedServiceId);
+  const activeServiceTitle =
+    selectedServiceId === 'general'
+      ? 'Other / Combined Security Package'
+      : matchedService?.title || services[0]?.title || 'Gate & Security Services';
+
+  useEffect(() => {
+    if (!detailsEdited) {
+      setDetails(buildPrefilledDetails(activeServiceTitle, requestType, propertyType));
+    }
+  }, [activeServiceTitle, requestType, propertyType, detailsEdited]);
+
+  function buildWhatsAppQuoteUrl(): string {
+    const waDigits = formatWhatsAppDigits(brand.primaryPhone);
+    const confirmations = [
+      confirmCalloutFee && '- Call-out / diagnostic fee before dispatch',
+      confirmWarranty && '- Manufacturer vs. workmanship warranty terms',
+      confirmScope && '- Itemized scope of work & lead time',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const lines = [
+      `Hello ${brand.companyName},`,
+      '',
+      '*Quote / Service Request*',
+      `Service: ${activeServiceTitle}`,
+      `Work Required: ${requestType}`,
+      `Property Type: ${propertyType}`,
+      `Name: ${name.trim()}`,
+      `Phone: ${phone.trim()}`,
+      `Suburb: ${suburb.trim()}`,
+      email.trim() ? `Email: ${email.trim()}` : '',
+      '',
+      '*Project / Fault Details:*',
+      details.trim() || buildPrefilledDetails(activeServiceTitle, requestType, propertyType),
+      confirmations ? `\n*Upfront Confirmations Requested:*\n${confirmations}` : '',
+    ].filter((line, idx, arr) => !(line === '' && arr[idx - 1] === ''));
+
+    return `https://wa.me/${waDigits}?text=${encodeURIComponent(lines.join('\n'))}`;
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -54,11 +113,22 @@ export function QuoteSection({
       return;
     }
 
+    const finalDetails =
+      details.trim() || buildPrefilledDetails(activeServiceTitle, requestType, propertyType);
+    const waUrl = buildWhatsAppQuoteUrl();
+    setLastWhatsAppUrl(waUrl);
+
+    // Open WhatsApp synchronously within the submit gesture via real anchor click
+    if (waAnchorRef.current) {
+      waAnchorRef.current.href = waUrl;
+      waAnchorRef.current.click();
+    }
+
     setSubmitting(true);
     try {
-      const matched = services.find((s) => s.id === selectedServiceId);
       const res = await fetch('/api/inquiries', {
         method: 'POST',
+        keepalive: true,
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           name: name.trim(),
@@ -68,11 +138,11 @@ export function QuoteSection({
           propertyType,
           requestType,
           serviceId: selectedServiceId,
-          serviceTitle: matched?.title || 'General Inquiry',
+          serviceTitle: activeServiceTitle,
           confirmCalloutFee,
           confirmWarranty,
           confirmScope,
-          details: details.trim(),
+          details: finalDetails,
         }),
       });
       const data = (await res.json()) as {id?: string; error?: string};
@@ -84,7 +154,7 @@ export function QuoteSection({
       setPhone('');
       setEmail('');
       setSuburb('');
-      setDetails('');
+      setDetailsEdited(false);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Network error submitting inquiry.');
     } finally {
@@ -236,6 +306,19 @@ export function QuoteSection({
                 </p>
               </div>
 
+              {/* Hidden anchor for synchronous WhatsApp launch without window.open */}
+              <a
+                ref={waAnchorRef}
+                href="#quote"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
+              >
+                Open WhatsApp Quote
+              </a>
+
               {submittedRef ? (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6">
                   <div className="flex items-start gap-3">
@@ -245,17 +328,30 @@ export function QuoteSection({
                         Inquiry Received ({submittedRef})
                       </h4>
                       <p className="mt-1 text-sm text-emerald-900">
-                        Your request has been logged in real time with our dispatch team. For urgent gate
-                        or alarm faults, call{' '}
+                        Your prefilled quote details have been logged with our dispatch desk and
+                        prepared for WhatsApp. For urgent faults, call{' '}
                         <span className="font-mono font-semibold tabular-nums">{brand.primaryPhone}</span>.
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setSubmittedRef(null)}
-                        className="mt-4 px-4 py-2 text-xs font-medium text-emerald-950 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer whitespace-nowrap"
-                      >
-                        Submit Another Request
-                      </button>
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        {lastWhatsAppUrl && (
+                          <a
+                            href={lastWhatsAppUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
+                          >
+                            <MessageCircle className="w-4 h-4" aria-hidden="true" />
+                            Continue in WhatsApp
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSubmittedRef(null)}
+                          className="px-4 py-2 text-xs font-medium text-emerald-950 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer whitespace-nowrap"
+                        >
+                          Submit Another Request
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -391,14 +487,33 @@ export function QuoteSection({
                   </div>
 
                   <div>
-                    <label htmlFor="quote-details" className="block text-xs font-medium text-slate-700 mb-1.5">
-                      System Details or Fault Description
-                    </label>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <label htmlFor="quote-details" className="block text-xs font-medium text-slate-700">
+                        System Details or Fault Description (Prefilled — edit anytime)
+                      </label>
+                      {detailsEdited && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDetailsEdited(false);
+                            setDetails(
+                              buildPrefilledDetails(activeServiceTitle, requestType, propertyType),
+                            );
+                          }}
+                          className="text-xs font-medium text-amber-700 hover:text-amber-800 cursor-pointer whitespace-nowrap"
+                        >
+                          Reset Prefill
+                        </button>
+                      )}
+                    </div>
                     <textarea
                       id="quote-details"
                       rows={3}
                       value={details}
-                      onChange={(e) => setDetails(e.target.value)}
+                      onChange={(e) => {
+                        setDetailsEdited(true);
+                        setDetails(e.target.value);
+                      }}
                       placeholder="Describe gate motor model, fence length, number of cameras, or fault symptoms..."
                       className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600"
                     />
@@ -448,12 +563,14 @@ export function QuoteSection({
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="px-6 py-3 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                      className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                     >
-                      {submitting ? 'Submitting Request...' : 'Send Quote Request'}
+                      <MessageCircle className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                      {submitting ? 'Opening WhatsApp...' : 'Send Quote Request'}
                     </button>
                     <span className="text-xs text-slate-500">
-                      Or call <span className="font-mono tabular-nums text-slate-700">{brand.primaryPhone}</span>
+                      Prefills WhatsApp &amp; notifies dispatch ({' '}
+                      <span className="font-mono tabular-nums text-slate-700">{brand.primaryPhone}</span>)
                     </span>
                   </div>
                 </form>

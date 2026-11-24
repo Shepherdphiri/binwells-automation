@@ -1,4 +1,4 @@
-import {useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
 import {ArrowRight, ChevronDown} from 'lucide-react';
 import type {FaqItem} from '../types.ts';
@@ -6,13 +6,21 @@ import type {FaqItem} from '../types.ts';
 interface FaqAccordionProps {
   faqs: FaqItem[];
   onRequestQuote: () => void;
+  focusedFaqId?: string | null;
 }
 
-export function FaqAccordion({faqs, onRequestQuote}: FaqAccordionProps) {
+export function FaqAccordion({faqs, onRequestQuote, focusedFaqId}: FaqAccordionProps) {
   const shouldReduceMotion = useReducedMotion();
   const activeFaqs = useMemo(() => faqs.filter((f) => f.active), [faqs]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [openId, setOpenId] = useState<string | null>(activeFaqs[0]?.id || null);
+
+  useEffect(() => {
+    if (focusedFaqId) {
+      setSelectedCategory('All');
+      setOpenId(focusedFaqId);
+    }
+  }, [focusedFaqId]);
 
   const categories = useMemo(() => {
     const unique = Array.from(new Set(activeFaqs.map((f) => f.category)));
@@ -29,7 +37,7 @@ export function FaqAccordion({faqs, onRequestQuote}: FaqAccordionProps) {
   }
 
   return (
-    <div className="pt-12 border-t border-slate-200">
+    <div id="faq-section" className="pt-12 border-t border-slate-200">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         {/* Left Sticky Intro */}
         <div className="lg:col-span-4 space-y-4">

@@ -2,6 +2,8 @@ import {ChangeEvent, FormEvent, useCallback, useEffect, useState} from 'react';
 import {
   ArrowLeft,
   Check,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   HelpCircle,
   Image as ImageIcon,
@@ -9,6 +11,7 @@ import {
   Lock,
   LogOut,
   Mail,
+  Plus,
   Settings,
   Trash2,
   Upload,
@@ -24,6 +27,7 @@ import type {
   QuoteInquiry,
   ServiceItem,
 } from '../types.ts';
+import {clampHeroOpacity, getHeroOpacityClass} from '../utils/heroOpacity.ts';
 import {BrandMark} from './BrandMark.tsx';
 import {ResilientImage} from './ResilientImage.tsx';
 
@@ -88,6 +92,7 @@ export function AdminConsole({
   // Brand & Page Copy draft state
   const [brandDraft, setBrandDraft] = useState<BrandSettings>(siteState.brand);
   const [phrasesText, setPhrasesText] = useState(siteState.brand.typewriterPhrases.join('\n'));
+  const [heroSlideUrlInput, setHeroSlideUrlInput] = useState('');
   const [brandBusy, setBrandBusy] = useState(false);
 
   // Media upload state
@@ -516,19 +521,73 @@ export function AdminConsole({
     setBrandBusy(true);
     try {
       const url = await uploadImageFile(file, {
-        title: 'Hero Banner',
+        title: 'Hero Carousel Photo',
         category: 'Hero',
         addToGallery: true,
       });
-      const nextBrand = {...brandDraft, heroImageUrl: url};
+      const existingSlides =
+        Array.isArray(brandDraft.heroImages) && brandDraft.heroImages.length > 0
+          ? brandDraft.heroImages
+          : [brandDraft.heroImageUrl];
+      const nextSlides = Array.from(new Set([url, ...existingSlides])).slice(0, 8);
+      const nextBrand = {
+        ...brandDraft,
+        heroImageUrl: nextSlides[0],
+        heroImages: nextSlides,
+      };
       setBrandDraft(nextBrand);
-      await persistBrand(nextBrand, 'Hero background image updated live.');
+      await persistBrand(nextBrand, 'Hero carousel updated and synced live.');
     } catch (err) {
       notify('err', err instanceof Error ? err.message : 'Hero upload failed.');
       setBrandBusy(false);
     } finally {
       e.target.value = '';
     }
+  }
+
+  function updateDraftHeroSlides(nextSlides: string[]) {
+    const cleaned = Array.from(new Set(nextSlides.filter(Boolean))).slice(0, 8);
+    if (cleaned.length === 0) return;
+    setBrandDraft((prev) => ({
+      ...prev,
+      heroImageUrl: cleaned[0],
+      heroImages: cleaned,
+    }));
+  }
+
+  function handleAddHeroSlideFromInput() {
+    const url = heroSlideUrlInput.trim();
+    if (!url) return;
+    const current =
+      Array.isArray(brandDraft.heroImages) && brandDraft.heroImages.length > 0
+        ? brandDraft.heroImages
+        : [brandDraft.heroImageUrl];
+    updateDraftHeroSlides([...current, url]);
+    setHeroSlideUrlInput('');
+  }
+
+  function handleMoveHeroSlide(index: number, delta: -1 | 1) {
+    const current = [...(brandDraft.heroImages || [brandDraft.heroImageUrl])];
+    const target = index + delta;
+    if (target < 0 || target >= current.length) return;
+    [current[index], current[target]] = [current[target], current[index]];
+    updateDraftHeroSlides(current);
+  }
+
+  function handleRemoveHeroSlide(url: string) {
+    const current = brandDraft.heroImages || [brandDraft.heroImageUrl];
+    if (current.length <= 1) {
+      notify('err', 'At least 1 hero background image is required.');
+      return;
+    }
+    updateDraftHeroSlides(current.filter((u) => u !== url));
+  }
+
+  async function handleApplyOpacityLive(nextOpacity: number) {
+    const clamped = clampHeroOpacity(nextOpacity);
+    const nextBrand = {...brandDraft, heroImageOpacity: clamped};
+    setBrandDraft(nextBrand);
+    await persistBrand(nextBrand, `Hero image opacity set to ${clamped}% live.`);
   }
 
   // Gallery / Media actions
@@ -568,10 +627,28 @@ export function AdminConsole({
     }
   }
 
-  async function handleAssignAsHero(url: string) {
+  async function handleToggleGalleryInHero(url: string) {
+    const current =
+      Array.isArray(siteState.brand.heroImages) && siteState.brand.heroImages.length > 0
+        ? siteState.brand.heroImages
+        : [siteState.brand.heroImageUrl];
+    const exists = current.includes(url);
+    if (exists && current.length <= 1) {
+      notify('err', 'At least 1 image must remain in the Hero Carousel.');
+      return;
+    }
+    const nextSlides = exists
+      ? current.filter((item) => item !== url)
+      : [url, ...current].slice(0, 8);
     await persistBrand(
-      {...siteState.brand, heroImageUrl: url},
-      'Hero background updated immediately across all connected browsers.',
+      {
+        ...siteState.brand,
+        heroImageUrl: nextSlides[0],
+        heroImages: nextSlides,
+      },
+      exists
+        ? 'Removed image from Hero Carousel live.'
+        : 'Added image to Hero Carousel live.',
     );
   }
 
@@ -1273,33 +1350,213 @@ export function AdminConsole({
                     />
                   </div>
 
-                  <div className="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-3">
-                    <span className="block text-xs font-semibold text-slate-800">Hero Background Image</span>
-                    <div className="flex items-center gap-4">
-                      <ResilientImage
-                        src={brandDraft.heroImageUrl}
-                        alt="Current hero preview"
-                        className="w-24 h-14 rounded-lg object-cover border border-slate-200 shrink-0"
-                      />
-                      <label className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 cursor-pointer whitespace-nowrap">
-                        <Upload className="w-3.5 h-3.5" aria-hidden="true" />
-                        Replace Hero Photo
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          onChange={handleHeroUpload}
-                          className="sr-only"
-                        />
-                      </label>
+                  <div className="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="block text-xs font-semibold text-slate-800">
+                        Hero Carousel &amp; Background Opacity
+                      </span>
+                      <span className="text-xs font-mono tabular-nums text-slate-500">
+                        {(brandDraft.heroImages?.length || 1)} slide
+                        {(brandDraft.heroImages?.length || 1) === 1 ? '' : 's'} ·{' '}
+                        {clampHeroOpacity(brandDraft.heroImageOpacity)}% opacity
+                      </span>
                     </div>
-                    <input
-                      type="text"
-                      aria-label="Hero Image URL"
-                      value={brandDraft.heroImageUrl}
-                      onChange={(e) => setBrandDraft({...brandDraft, heroImageUrl: e.target.value})}
-                      placeholder="Or paste HTTPS hero image URL..."
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md"
-                    />
+
+                    {/* Live Hero Opacity Preview */}
+                    <div className="relative h-28 rounded-lg overflow-hidden bg-slate-950 border border-slate-300">
+                      <div
+                        className={`absolute inset-0 transition-opacity duration-200 ${getHeroOpacityClass(
+                          brandDraft.heroImageOpacity,
+                        )}`}
+                      >
+                        <ResilientImage
+                          src={brandDraft.heroImages?.[0] || brandDraft.heroImageUrl}
+                          alt="Hero opacity preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/50 to-slate-950/20" />
+                      <div className="relative z-10 h-full px-4 flex flex-col justify-center">
+                        <span className="text-sm font-bold text-white line-clamp-1">
+                          {brandDraft.heroTitle}
+                        </span>
+                        <span className="text-xs text-amber-400 font-medium mt-0.5">
+                          Live Opacity Preview ({clampHeroOpacity(brandDraft.heroImageOpacity)}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Opacity Slider & Quick Presets */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <label
+                          htmlFor="hero-opacity-slider"
+                          className="text-xs font-medium text-slate-700"
+                        >
+                          Image Brightness / Opacity
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          {[35, 55, 75, 90].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => handleApplyOpacityLive(preset)}
+                              disabled={brandBusy}
+                              className={`px-2 py-0.5 text-xs font-mono tabular-nums rounded border transition-colors cursor-pointer ${
+                                clampHeroOpacity(brandDraft.heroImageOpacity) === preset
+                                  ? 'bg-slate-900 text-white border-slate-900'
+                                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                              }`}
+                            >
+                              {preset}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input
+                          id="hero-opacity-slider"
+                          type="range"
+                          min={20}
+                          max={95}
+                          step={5}
+                          value={clampHeroOpacity(brandDraft.heroImageOpacity)}
+                          onChange={(e) =>
+                            setBrandDraft({
+                              ...brandDraft,
+                              heroImageOpacity: Number(e.target.value),
+                            })
+                          }
+                          className="flex-1 accent-amber-600 cursor-pointer"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleApplyOpacityLive(brandDraft.heroImageOpacity ?? 55)
+                          }
+                          disabled={brandBusy}
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 disabled:opacity-60 cursor-pointer whitespace-nowrap"
+                        >
+                          Apply Live
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Active Carousel Slides */}
+                    <div className="space-y-2 pt-2 border-t border-slate-200">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-slate-700">
+                          Carousel Slides (auto-rotates every 5.5s)
+                        </span>
+                        <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 cursor-pointer whitespace-nowrap">
+                          <Upload className="w-3.5 h-3.5" aria-hidden="true" />
+                          Add Photo
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={handleHeroUpload}
+                            className="sr-only"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {(brandDraft.heroImages && brandDraft.heroImages.length > 0
+                          ? brandDraft.heroImages
+                          : [brandDraft.heroImageUrl]
+                        ).map((slideUrl, idx, arr) => (
+                          <div
+                            key={`${slideUrl}-${idx}`}
+                            className="bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col"
+                          >
+                            <div className="aspect-[16/10] bg-slate-100 relative">
+                              <ResilientImage
+                                src={slideUrl}
+                                alt={`Hero slide ${idx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <span className="absolute top-1 left-1 px-1.5 py-0.5 text-[11px] font-mono tabular-nums font-semibold bg-slate-950/80 text-white rounded">
+                                #{idx + 1}
+                              </span>
+                            </div>
+                            <div className="p-1.5 flex items-center justify-between gap-1 bg-white">
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  aria-label={`Move slide ${idx + 1} earlier`}
+                                  disabled={idx === 0}
+                                  onClick={() => handleMoveHeroSlide(idx, -1)}
+                                  className="p-1 text-slate-600 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
+                                >
+                                  <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`Move slide ${idx + 1} later`}
+                                  disabled={idx === arr.length - 1}
+                                  onClick={() => handleMoveHeroSlide(idx, 1)}
+                                  className="p-1 text-slate-600 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
+                                >
+                                  <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                aria-label={`Remove slide ${idx + 1}`}
+                                onClick={() => handleRemoveHeroSlide(slideUrl)}
+                                className="p-1 text-slate-500 hover:text-red-700 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <select
+                          aria-label="Add existing gallery photo to hero carousel"
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              const current =
+                                brandDraft.heroImages?.length
+                                  ? brandDraft.heroImages
+                                  : [brandDraft.heroImageUrl];
+                              updateDraftHeroSlides([...current, e.target.value]);
+                              e.target.value = '';
+                            }
+                          }}
+                          className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md text-slate-700"
+                        >
+                          <option value="">+ Pick from Gallery...</option>
+                          {siteState.gallery.map((g) => (
+                            <option key={g.id} value={g.url}>
+                              {g.title}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            aria-label="Add Hero Slide URL"
+                            value={heroSlideUrlInput}
+                            onChange={(e) => setHeroSlideUrlInput(e.target.value)}
+                            placeholder="Or paste HTTPS image URL..."
+                            className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddHeroSlideFromInput}
+                            aria-label="Add slide URL"
+                            className="px-2.5 py-1.5 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-md hover:bg-slate-100 cursor-pointer shrink-0 inline-flex items-center gap-1"
+                          >
+                            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1775,7 +2032,12 @@ export function AdminConsole({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {siteState.gallery.map((img) => {
-                    const isHero = siteState.brand.heroImageUrl === img.url;
+                    const heroList =
+                      Array.isArray(siteState.brand.heroImages) &&
+                      siteState.brand.heroImages.length > 0
+                        ? siteState.brand.heroImages
+                        : [siteState.brand.heroImageUrl];
+                    const isHero = heroList.includes(img.url);
                     return (
                       <div key={img.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
                         <div className="aspect-[4/3] bg-slate-100">
@@ -1795,11 +2057,14 @@ export function AdminConsole({
                             <div className="flex items-center justify-between gap-2">
                               <button
                                 type="button"
-                                onClick={() => handleAssignAsHero(img.url)}
-                                disabled={isHero}
-                                className="px-2.5 py-1.5 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                                onClick={() => handleToggleGalleryInHero(img.url)}
+                                className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap ${
+                                  isHero
+                                    ? 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800'
+                                    : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                                }`}
                               >
-                                {isHero ? 'Active Hero' : 'Set as Hero'}
+                                {isHero ? 'In Hero Carousel (Remove)' : '+ Add to Hero Carousel'}
                               </button>
                               <button
                                 type="button"

@@ -57,6 +57,13 @@ function createInitialStore(): PersistedStore {
       heroSubtitle:
         'Installation and repair of sliding and swing gate motors, garage doors, solar electric fencing, CCTV systems, alarms, electrical work, and custom steel gates across Bishopscourt, Retreat, and greater Cape Town.',
       heroImageUrl: '/src/assets/images/hero_cape_town_gate_1795439779507.jpg',
+      heroImages: [
+        '/src/assets/images/hero_cape_town_gate_1795439779507.jpg',
+        '/src/assets/images/service_gate_motor_1795439779271.jpg',
+        '/src/assets/images/service_electric_fence_1795439779591.jpg',
+        '/src/assets/images/service_steel_fabrication_1795439780499.jpg',
+      ],
+      heroImageOpacity: 55,
       typewriterPhrases: [
         'Sliding & Swing Gate Motor Automation',
         'Solar-Powered Perimeter Electric Fencing',
@@ -329,8 +336,17 @@ function loadStore(): PersistedStore {
       const raw = fs.readFileSync(STORE_PATH, 'utf8');
       const parsed = JSON.parse(raw) as Partial<PersistedStore>;
       const defaults = createInitialStore();
+      const parsedBrand = (parsed.brand || {}) as Partial<BrandSettings>;
+      const mergedBrand: BrandSettings = {...defaults.brand, ...parsedBrand};
+      if (!Array.isArray(parsedBrand.heroImages) || parsedBrand.heroImages.length === 0) {
+        const primary = mergedBrand.heroImageUrl || defaults.brand.heroImageUrl;
+        mergedBrand.heroImages = Array.from(new Set([primary, ...defaults.brand.heroImages])).slice(0, 4);
+      }
+      if (typeof parsedBrand.heroImageOpacity !== 'number' || !Number.isFinite(parsedBrand.heroImageOpacity)) {
+        mergedBrand.heroImageOpacity = defaults.brand.heroImageOpacity;
+      }
       return {
-        brand: {...defaults.brand, ...(parsed.brand || {})},
+        brand: mergedBrand,
         services: Array.isArray(parsed.services) ? parsed.services : defaults.services,
         news: Array.isArray(parsed.news) ? parsed.news : defaults.news,
         gallery: Array.isArray(parsed.gallery) ? parsed.gallery : defaults.gallery,
@@ -923,6 +939,26 @@ app.put('/api/admin/brand', requireAdmin, (req, res) => {
     res.status(400).json({error: 'Hero image URL must be a valid relative asset or http(s) URL.'});
     return;
   }
+
+  const rawHeroImages = Array.isArray(b.heroImages) ? b.heroImages : store.brand.heroImages;
+  const sanitizedHeroImages = Array.from(
+    new Set(
+      rawHeroImages
+        .map((u) => sanitizeText(u, 300))
+        .filter((u) => Boolean(u) && isSafeMediaOrWebUrl(u, false)),
+    ),
+  ).slice(0, 8);
+
+  const resolvedHeroImages =
+    sanitizedHeroImages.length > 0 ? sanitizedHeroImages : [heroImageUrl];
+  const resolvedHeroPrimary = resolvedHeroImages[0] || heroImageUrl;
+
+  const rawOpacity =
+    typeof b.heroImageOpacity === 'number' && Number.isFinite(b.heroImageOpacity)
+      ? b.heroImageOpacity
+      : store.brand.heroImageOpacity;
+  const heroImageOpacity = Math.min(95, Math.max(20, Math.round(rawOpacity / 5) * 5));
+
   if (!isSafeMediaOrWebUrl(logoUrl, true)) {
     res.status(400).json({error: 'Logo URL must be a valid relative asset or http(s) URL.'});
     return;
@@ -962,7 +998,9 @@ app.put('/api/admin/brand', requireAdmin, (req, res) => {
     tagline: sanitizeText(b.tagline, 160) || store.brand.tagline,
     heroTitle: sanitizeText(b.heroTitle, 180) || store.brand.heroTitle,
     heroSubtitle: sanitizeText(b.heroSubtitle, 450) || store.brand.heroSubtitle,
-    heroImageUrl,
+    heroImageUrl: resolvedHeroPrimary,
+    heroImages: resolvedHeroImages,
+    heroImageOpacity,
     typewriterPhrases:
       typewriterPhrases.length > 0 ? typewriterPhrases : store.brand.typewriterPhrases,
     logoUrl,
