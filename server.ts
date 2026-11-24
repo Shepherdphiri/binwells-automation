@@ -115,7 +115,7 @@ function createInitialStore(): PersistedStore {
         },
       ],
       contactPageEyebrow: 'Cape Town Coverage & Contact',
-      contactPageTitle: 'Direct dispatch from Bishopscourt & Retreat',
+      contactPageTitle: '',
       contactPageSubtitle:
         'Serving residential estates, commercial offices, and industrial units across Cape Town. Speak directly with our team to schedule an inspection or confirm pricing.',
       footerCredit: 'Developed by Shepherd Zisper Phiri',
@@ -350,6 +350,9 @@ function loadStore(): PersistedStore {
       }
       if (mergedBrand.secondaryPhone?.includes('936') || mergedBrand.secondaryPhone?.includes('4009')) {
         mergedBrand.secondaryPhone = '';
+      }
+      if (mergedBrand.contactPageTitle?.toLowerCase().includes('bishopscourt')) {
+        mergedBrand.contactPageTitle = '';
       }
       if (Array.isArray(mergedBrand.aboutPillars)) {
         mergedBrand.aboutPillars = mergedBrand.aboutPillars.map((pillar) => ({
@@ -1047,7 +1050,7 @@ app.put('/api/admin/brand', requireAdmin, (req, res) => {
     aboutStoryBody: sanitizeText(b.aboutStoryBody, 700) || store.brand.aboutStoryBody,
     aboutPillars: aboutPillars.length > 0 ? aboutPillars : store.brand.aboutPillars,
     contactPageEyebrow: sanitizeText(b.contactPageEyebrow, 80) || store.brand.contactPageEyebrow,
-    contactPageTitle: sanitizeText(b.contactPageTitle, 180) || store.brand.contactPageTitle,
+    contactPageTitle: sanitizeText(b.contactPageTitle, 180),
     contactPageSubtitle: sanitizeText(b.contactPageSubtitle, 400) || store.brand.contactPageSubtitle,
     footerCredit: sanitizeText(b.footerCredit, 120) || store.brand.footerCredit,
     updatedAt: new Date().toISOString(),

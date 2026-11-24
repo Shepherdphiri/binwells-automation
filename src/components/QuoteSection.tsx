@@ -158,10 +158,12 @@ export function QuoteSection({
               <p className="text-sm sm:text-base font-semibold text-amber-700 tracking-wide mb-2">
                 {brand.contactPageEyebrow}
               </p>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 text-balance">
-                {brand.contactPageTitle}
-              </h2>
-              <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed">
+              {brand.contactPageTitle && (
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 text-balance mb-3">
+                  {brand.contactPageTitle}
+                </h2>
+              )}
+              <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
                 {brand.contactPageSubtitle}
               </p>
             </div>
