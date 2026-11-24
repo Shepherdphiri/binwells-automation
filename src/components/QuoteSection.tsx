@@ -94,7 +94,7 @@ export function QuoteSection({
 
   return (
     <section id="contact" className="py-20 bg-white border-t border-slate-200">
-      <div className="max-w-6xl mx-auto px-6">
+      <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           {/* Left Column: Cape Town Locations, Direct Phones & Transparency */}
           <div className="lg:col-span-5 space-y-8">

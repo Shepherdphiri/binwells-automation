@@ -820,7 +820,7 @@ export function AdminConsole({
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16 py-8">
         {/* Console Top Breadcrumb Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-200">
           <div className="flex items-center gap-3">

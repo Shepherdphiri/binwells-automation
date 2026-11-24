@@ -165,7 +165,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
       {/* Strict 3-Zone Top Navigation Bar: HOME | SERVICES | ABOUT US | CONTACT US */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-8">
+        <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16 h-16 flex items-center justify-between gap-8">
           {/* Zone 1: Single-line Brand Wordmark */}
           <a
             href="#home"
@@ -176,7 +176,7 @@ export default function App() {
             className="flex items-center gap-2.5 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 rounded-md"
           >
             <BrandMark logoUrl={brand.logoUrl} companyName={brand.companyName} sizeClass="w-8 h-8" />
-            <span className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 truncate max-w-[210px] sm:max-w-[270px]">
+            <span className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 truncate max-w-[210px] sm:max-w-none">
               {brand.companyName}
             </span>
           </a>
@@ -333,12 +333,12 @@ export default function App() {
                 className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-slate-950/35"
               />
 
-              <div className="relative z-10 max-w-7xl mx-auto px-6 py-24 sm:py-28 lg:py-36">
+              <div className="relative z-10 w-full px-6 sm:px-10 lg:px-14 xl:px-16 py-24 sm:py-28 lg:py-36">
                 <motion.div
                   initial={shouldReduceMotion ? false : {opacity: 0, y: 12}}
                   animate={{opacity: 1, y: 0}}
                   transition={{duration: 0.35, ease: [0.16, 1, 0.3, 1]}}
-                  className="max-w-3xl space-y-6"
+                  className="max-w-4xl space-y-6"
                 >
                   <h1
                     className="font-display font-bold tracking-tight text-white text-balance leading-[1.08]"
@@ -402,7 +402,7 @@ export default function App() {
                   aria-labelledby="previous-work-heading"
                   className="py-16 sm:py-20 bg-white border-b border-slate-200"
                 >
-                  <div className="max-w-7xl mx-auto px-6">
+                  <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16">
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
                       <div className="max-w-2xl">
                         <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
@@ -561,7 +561,7 @@ export default function App() {
 
             {/* Overview of What We Do */}
             <section className="py-20 bg-slate-50">
-              <div className="max-w-7xl mx-auto px-6">
+              <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
                   <div className="max-w-2xl">
                     <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
@@ -663,21 +663,21 @@ export default function App() {
             className="flex-1 bg-slate-50"
           >
             <section className="bg-white border-b border-slate-200 py-14">
-              <div className="max-w-7xl mx-auto px-6">
+              <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16">
                 <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
                   {brand.servicesPageEyebrow}
                 </p>
-                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance max-w-3xl">
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance max-w-4xl">
                   {brand.servicesPageTitle}
                 </h1>
-                <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl">
+                <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed max-w-3xl">
                   {brand.servicesPageSubtitle}
                 </p>
               </div>
             </section>
 
             <section className="py-16">
-              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16 grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {activeServices.map((srv, idx) => {
                   const Icon = getServiceIcon(idx);
                   const isWide = srv.featured || (activeServices.length % 2 === 1 && idx === 0);
@@ -765,21 +765,21 @@ export default function App() {
             className="flex-1 bg-white"
           >
             <section className="bg-slate-50 border-b border-slate-200 py-14">
-              <div className="max-w-7xl mx-auto px-6">
+              <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16">
                 <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
                   {brand.aboutPageEyebrow}
                 </p>
-                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance max-w-3xl">
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance max-w-4xl">
                   {brand.aboutPageTitle}
                 </h1>
-                <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl">
+                <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed max-w-3xl">
                   {brand.aboutPageSubtitle}
                 </p>
               </div>
             </section>
 
             <section className="py-16">
-              <div className="max-w-7xl mx-auto px-6 space-y-16">
+              <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16 space-y-16">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
                   <div className="lg:col-span-5 space-y-4">
                     <h2 className="text-2xl font-bold tracking-tight text-slate-900 text-balance">
@@ -953,7 +953,7 @@ export default function App() {
 
       {/* Quiet Footer with Credit & Discreet Shield Admin Trigger */}
       <footer className="bg-slate-950 text-slate-300 border-t border-slate-900">
-        <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16 py-12">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pb-10 border-b border-slate-800">
             <div className="md:col-span-5 space-y-3">
               <div className="flex items-center gap-2.5">
