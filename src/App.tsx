@@ -326,7 +326,7 @@ export default function App() {
 
               <div
                 aria-hidden="true"
-                className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/75 to-slate-950/50"
+                className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/75 to-slate-950/60"
               />
               <div
                 aria-hidden="true"
@@ -338,22 +338,22 @@ export default function App() {
                   initial={shouldReduceMotion ? false : {opacity: 0, y: 12}}
                   animate={{opacity: 1, y: 0}}
                   transition={{duration: 0.35, ease: [0.16, 1, 0.3, 1]}}
-                  className="max-w-4xl space-y-6"
+                  className="w-full space-y-6"
                 >
                   <h1
                     className="font-display font-bold tracking-tight text-white text-balance leading-[1.08]"
-                    style={{fontSize: 'clamp(2.25rem, 4.2vw, 3.75rem)'}}
+                    style={{fontSize: 'clamp(2.35rem, 4.1vw, 4.25rem)'}}
                   >
                     {brand.heroTitle}
                   </h1>
 
-                  <div className="min-h-[2.25rem] sm:min-h-[2.5rem] flex items-center">
-                    <p className="font-display text-lg sm:text-2xl font-semibold text-amber-400 tracking-tight">
+                  <div className="min-h-[2.5rem] sm:min-h-[2.75rem] flex items-center">
+                    <p className="font-display text-xl sm:text-2xl lg:text-3xl font-semibold text-amber-400 tracking-tight">
                       <TypewriterText phrases={brand.typewriterPhrases} />
                     </p>
                   </div>
 
-                  <p className="text-base sm:text-lg text-slate-200 leading-relaxed max-w-[60ch]">
+                  <p className="text-base sm:text-lg lg:text-xl text-slate-200 leading-relaxed max-w-5xl">
                     {brand.heroSubtitle}
                   </p>
 
