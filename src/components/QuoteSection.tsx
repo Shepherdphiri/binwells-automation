@@ -173,7 +173,7 @@ export function QuoteSection({
                   aria-hidden="true"
                 />
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Direct Telephone Lines</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Direct Phone / WhatsApp Line</h3>
                   <div className="mt-1.5 flex flex-col gap-1 font-mono text-sm tabular-nums text-slate-800">
                     <a
                       href={`tel:${brand.primaryPhone.replace(/\s+/g, '')}`}
@@ -181,17 +181,6 @@ export function QuoteSection({
                     >
                       {brand.primaryPhone}
                     </a>
-                    {brand.secondaryPhone && (
-                      <a
-                        href={`tel:${brand.secondaryPhone.replace(/\s+/g, '')}`}
-                        className="text-slate-600 hover:text-amber-700 transition-colors w-fit"
-                      >
-                        {brand.secondaryPhone}{' '}
-                        <span className="font-sans text-xs text-slate-500">
-                          (Alternate / Local Promo Line)
-                        </span>
-                      </a>
-                    )}
                   </div>
                 </div>
               </div>
@@ -220,12 +209,8 @@ export function QuoteSection({
                   aria-hidden="true"
                 />
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Listed Cape Town Addresses</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Listed Cape Town Address</h3>
                   <ul className="mt-1.5 space-y-2 text-sm text-slate-700">
-                    <li>
-                      <span className="font-medium text-slate-900">Bishopscourt:</span>{' '}
-                      {brand.bishopscourtAddress}
-                    </li>
                     <li>
                       <span className="font-medium text-slate-900">Retreat:</span>{' '}
                       {brand.retreatAddress}

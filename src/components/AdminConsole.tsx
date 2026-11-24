@@ -1614,58 +1614,30 @@ export function AdminConsole({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="brand-phone1" className="block text-xs font-medium text-slate-700 mb-1">
-                      Primary Phone
-                    </label>
-                    <input
-                      id="brand-phone1"
-                      type="text"
-                      value={brandDraft.primaryPhone}
-                      onChange={(e) => setBrandDraft({...brandDraft, primaryPhone: e.target.value})}
-                      className="w-full px-3 py-2 text-sm font-mono tabular-nums border border-slate-300 rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="brand-phone2" className="block text-xs font-medium text-slate-700 mb-1">
-                      Secondary / Promo Phone
-                    </label>
-                    <input
-                      id="brand-phone2"
-                      type="text"
-                      value={brandDraft.secondaryPhone}
-                      onChange={(e) => setBrandDraft({...brandDraft, secondaryPhone: e.target.value})}
-                      className="w-full px-3 py-2 text-sm font-mono tabular-nums border border-slate-300 rounded-lg"
-                    />
-                  </div>
+                <div>
+                  <label htmlFor="brand-phone1" className="block text-xs font-medium text-slate-700 mb-1">
+                    Primary Phone / WhatsApp
+                  </label>
+                  <input
+                    id="brand-phone1"
+                    type="text"
+                    value={brandDraft.primaryPhone}
+                    onChange={(e) => setBrandDraft({...brandDraft, primaryPhone: e.target.value})}
+                    className="w-full px-3 py-2 text-sm font-mono tabular-nums border border-slate-300 rounded-lg"
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="brand-addr1" className="block text-xs font-medium text-slate-700 mb-1">
-                      Bishopscourt Address
-                    </label>
-                    <input
-                      id="brand-addr1"
-                      type="text"
-                      value={brandDraft.bishopscourtAddress}
-                      onChange={(e) => setBrandDraft({...brandDraft, bishopscourtAddress: e.target.value})}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="brand-addr2" className="block text-xs font-medium text-slate-700 mb-1">
-                      Retreat Address
-                    </label>
-                    <input
-                      id="brand-addr2"
-                      type="text"
-                      value={brandDraft.retreatAddress}
-                      onChange={(e) => setBrandDraft({...brandDraft, retreatAddress: e.target.value})}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
-                    />
-                  </div>
+                <div>
+                  <label htmlFor="brand-addr2" className="block text-xs font-medium text-slate-700 mb-1">
+                    Cape Town Street Address (Retreat)
+                  </label>
+                  <input
+                    id="brand-addr2"
+                    type="text"
+                    value={brandDraft.retreatAddress}
+                    onChange={(e) => setBrandDraft({...brandDraft, retreatAddress: e.target.value})}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

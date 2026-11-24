@@ -1087,11 +1087,15 @@ export default function App() {
             </div>
 
             <div className="md:col-span-4 space-y-2 text-xs">
-              <h4 className="font-semibold text-white">Cape Town Bases</h4>
-              <p className="text-slate-400">{brand.bishopscourtAddress}</p>
+              <h4 className="font-semibold text-white">Cape Town Location</h4>
               <p className="text-slate-400">{brand.retreatAddress}</p>
               <p className="font-mono tabular-nums text-amber-400 pt-1">
-                {brand.primaryPhone} · {brand.secondaryPhone}
+                <a
+                  href={`tel:${brand.primaryPhone.replace(/\s+/g, '')}`}
+                  className="hover:underline"
+                >
+                  {brand.primaryPhone}
+                </a>
               </p>
             </div>
 

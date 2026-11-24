@@ -72,9 +72,9 @@ function createInitialStore(): PersistedStore {
       ],
       logoUrl: '',
       primaryPhone: '+27 73 415 4108',
-      secondaryPhone: '+27 82 936 4009',
+      secondaryPhone: '',
       contactEmail: '',
-      bishopscourtAddress: '112 Rhodes Dr, Bishopscourt, Cape Town',
+      bishopscourtAddress: '',
       retreatAddress: '19 Auriga Rd, Retreat, Cape Town',
       retreatNote: 'Roughly a 15-minute drive south of the Foreshore / Cape Town CBD depending on traffic.',
       facebookPageName: "Binwell's Automation and Electronic Solution",
@@ -106,7 +106,7 @@ function createInitialStore(): PersistedStore {
         {
           title: 'Local Footprint',
           description:
-            'Listed at 112 Rhodes Dr, Bishopscourt and 19 Auriga Rd, Retreat — roughly 15 minutes south of the Foreshore/CBD.',
+            'Based at 19 Auriga Rd, Retreat — roughly 15 minutes south of the Foreshore/CBD, serving greater Cape Town.',
         },
         {
           title: 'Clear Upfront Terms',
@@ -303,7 +303,7 @@ function createInitialStore(): PersistedStore {
         category: 'Service Areas',
         question: 'Which Cape Town suburbs and property types do you cover?',
         answer:
-          'Binwells Automation and Security Services serves residential homes, estates, commercial offices, and industrial facilities across Cape Town from listed bases at 112 Rhodes Dr, Bishopscourt and 19 Auriga Rd, Retreat (roughly 15 minutes south of the Foreshore/CBD depending on traffic).',
+          'Binwells Automation and Security Services serves residential homes, estates, commercial offices, and industrial facilities across Cape Town from 19 Auriga Rd, Retreat (roughly 15 minutes south of the Foreshore/CBD depending on traffic), covering Southern Suburbs, Bishopscourt, Constantia, and greater Cape Town.',
         active: true,
       },
       {
@@ -345,12 +345,32 @@ function loadStore(): PersistedStore {
       if (typeof parsedBrand.heroImageOpacity !== 'number' || !Number.isFinite(parsedBrand.heroImageOpacity)) {
         mergedBrand.heroImageOpacity = defaults.brand.heroImageOpacity;
       }
+      if (mergedBrand.bishopscourtAddress?.toLowerCase().includes('112 rhodes')) {
+        mergedBrand.bishopscourtAddress = '';
+      }
+      if (mergedBrand.secondaryPhone?.includes('936') || mergedBrand.secondaryPhone?.includes('4009')) {
+        mergedBrand.secondaryPhone = '';
+      }
+      if (Array.isArray(mergedBrand.aboutPillars)) {
+        mergedBrand.aboutPillars = mergedBrand.aboutPillars.map((pillar) => ({
+          ...pillar,
+          description: pillar.description.includes('112 Rhodes')
+            ? 'Based at 19 Auriga Rd, Retreat — roughly 15 minutes south of the Foreshore/CBD, serving greater Cape Town.'
+            : pillar.description,
+        }));
+      }
+      const nextFaqs = (Array.isArray(parsed.faqs) ? parsed.faqs : defaults.faqs).map((faq) => ({
+        ...faq,
+        answer: faq.answer.includes('112 Rhodes')
+          ? 'Binwells Automation and Security Services serves residential homes, estates, commercial offices, and industrial facilities across Cape Town from 19 Auriga Rd, Retreat (roughly 15 minutes south of the Foreshore/CBD depending on traffic), covering Southern Suburbs, Bishopscourt, Constantia, and greater Cape Town.'
+          : faq.answer,
+      }));
       return {
         brand: mergedBrand,
         services: Array.isArray(parsed.services) ? parsed.services : defaults.services,
         news: Array.isArray(parsed.news) ? parsed.news : defaults.news,
         gallery: Array.isArray(parsed.gallery) ? parsed.gallery : defaults.gallery,
-        faqs: Array.isArray(parsed.faqs) ? parsed.faqs : defaults.faqs,
+        faqs: nextFaqs,
         inquiries: Array.isArray(parsed.inquiries) ? parsed.inquiries : [],
         adminCredential: parsed.adminCredential ?? null,
       };
@@ -1005,9 +1025,9 @@ app.put('/api/admin/brand', requireAdmin, (req, res) => {
       typewriterPhrases.length > 0 ? typewriterPhrases : store.brand.typewriterPhrases,
     logoUrl,
     primaryPhone: sanitizeText(b.primaryPhone, 40) || store.brand.primaryPhone,
-    secondaryPhone: sanitizeText(b.secondaryPhone, 40) || store.brand.secondaryPhone,
+    secondaryPhone: sanitizeText(b.secondaryPhone, 40),
     contactEmail,
-    bishopscourtAddress: sanitizeText(b.bishopscourtAddress, 180) || store.brand.bishopscourtAddress,
+    bishopscourtAddress: sanitizeText(b.bishopscourtAddress, 180),
     retreatAddress: sanitizeText(b.retreatAddress, 180) || store.brand.retreatAddress,
     retreatNote: sanitizeText(b.retreatNote, 220) || store.brand.retreatNote,
     facebookPageName: sanitizeText(b.facebookPageName, 120) || store.brand.facebookPageName,
