@@ -196,7 +196,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
       {/* Strict 3-Zone Top Navigation Bar: HOME | SERVICES | ABOUT US | CONTACT US */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
-        <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16 h-16 flex items-center justify-between gap-8">
+        <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16 h-16 sm:h-[72px] flex items-center justify-between gap-8">
           {/* Zone 1: Single-line Brand Wordmark */}
           <a
             href="#home"
@@ -204,9 +204,9 @@ export default function App() {
               e.preventDefault();
               navigateTo('home');
             }}
-            className="flex items-center gap-2.5 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 rounded-md"
+            className="flex items-center gap-3 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 rounded-md"
           >
-            <BrandMark logoUrl={brand.logoUrl} companyName={brand.companyName} sizeClass="w-8 h-8" />
+            <BrandMark logoUrl={brand.logoUrl} companyName={brand.companyName} sizeClass="w-10 h-10 sm:w-12 sm:h-12" />
             <span className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 truncate max-w-[210px] sm:max-w-[300px] lg:max-w-[250px] xl:max-w-none">
               {brand.companyName}
             </span>
@@ -522,7 +522,7 @@ export default function App() {
                   <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16">
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
                       <div className="max-w-2xl">
-                        <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
+                        <p className="text-sm sm:text-base font-semibold text-amber-700 tracking-wide mb-2">
                           Completed Installations
                         </p>
                         <h2
@@ -681,7 +681,7 @@ export default function App() {
               <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
                   <div className="max-w-2xl">
-                    <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
+                    <p className="text-sm sm:text-base font-semibold text-amber-700 tracking-wide mb-2">
                       {brand.homeOverviewEyebrow}
                     </p>
                     <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 text-balance">
@@ -781,7 +781,7 @@ export default function App() {
           >
             <section className="bg-white border-b border-slate-200 py-14">
               <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16">
-                <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
+                <p className="text-sm sm:text-base font-semibold text-amber-700 tracking-wide mb-2">
                   {brand.servicesPageEyebrow}
                 </p>
                 <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance max-w-4xl">
@@ -884,7 +884,7 @@ export default function App() {
           >
             <section className="bg-slate-50 border-b border-slate-200 py-14">
               <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16">
-                <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
+                <p className="text-sm sm:text-base font-semibold text-amber-700 tracking-wide mb-2">
                   {brand.aboutPageEyebrow}
                 </p>
                 <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance max-w-4xl">
@@ -956,7 +956,7 @@ export default function App() {
                 <div className="pt-12 border-t border-slate-200">
                   <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
                     <div>
-                      <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
+                      <p className="text-sm sm:text-base font-semibold text-amber-700 tracking-wide mb-2">
                         Project &amp; Equipment Gallery
                       </p>
                       <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
@@ -1075,15 +1075,14 @@ export default function App() {
         <div className="w-full px-6 sm:px-10 lg:px-14 xl:px-16 py-12">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pb-10 border-b border-slate-800">
             <div className="md:col-span-5 space-y-3">
-              <div className="flex items-center gap-2.5">
-                <BrandMark logoUrl={brand.logoUrl} companyName={brand.companyName} sizeClass="w-8 h-8" />
+              <div className="flex items-center gap-3">
+                <BrandMark logoUrl={brand.logoUrl} companyName={brand.companyName} sizeClass="w-11 h-11" />
                 <span className="font-display text-base font-bold text-white">
                   {brand.companyName}
                 </span>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed max-w-md">
-                {brand.tagline}. Listed online as {brand.tradingAs}. Confirm exact job scope,
-                warranty coverage, and call-out fees before dispatch.
+                {brand.tagline}. Listed online as {brand.tradingAs}.
               </p>
             </div>
 
@@ -1131,16 +1130,16 @@ export default function App() {
             </div>
           </div>
 
-          <div className="pt-6 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500">
-            <span>© {new Date().getFullYear()} {brand.companyName}. Cape Town, South Africa.</span>
-            <div className="flex items-center gap-3">
-              <span>{brand.footerCredit}</span>
+          <div className="pt-6">
+            <div className="relative flex flex-col items-center justify-center text-center gap-1.5 text-xs text-slate-500">
+              <span>© {new Date().getFullYear()} {brand.companyName}. Cape Town, South Africa.</span>
+              <span className="text-slate-400">{brand.footerCredit}</span>
               <button
                 type="button"
                 onClick={() => navigateTo('admin')}
                 aria-label="Administrator Sign-In"
                 title="Administrator Sign-In"
-                className="p-1.5 text-slate-600 hover:text-amber-400 transition-colors cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                className="mt-1 sm:mt-0 sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2 p-1.5 text-slate-600 hover:text-amber-400 transition-colors cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
                 <Shield
                   className="w-4 h-4 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-110"

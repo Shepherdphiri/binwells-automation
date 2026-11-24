@@ -1,5 +1,5 @@
 import {FormEvent, useEffect, useRef, useState} from 'react';
-import {CheckCircle2, ExternalLink, Mail, MapPin, MessageCircle, Phone, ShieldAlert} from 'lucide-react';
+import {CheckCircle2, ExternalLink, Mail, MapPin, MessageCircle, Phone} from 'lucide-react';
 import type {BrandSettings, ServiceItem} from '../types.ts';
 
 interface QuoteSectionProps {
@@ -36,9 +36,6 @@ export function QuoteSection({
   const [suburb, setSuburb] = useState('');
   const [propertyType, setPropertyType] = useState<'Residential' | 'Commercial' | 'Industrial'>('Residential');
   const [requestType, setRequestType] = useState<'New Installation' | 'Repair & Maintenance'>('New Installation');
-  const [confirmCalloutFee, setConfirmCalloutFee] = useState(true);
-  const [confirmWarranty, setConfirmWarranty] = useState(true);
-  const [confirmScope, setConfirmScope] = useState(true);
   const [details, setDetails] = useState('');
   const [detailsEdited, setDetailsEdited] = useState(false);
 
@@ -67,13 +64,6 @@ export function QuoteSection({
 
   function buildWhatsAppQuoteUrl(): string {
     const waDigits = formatWhatsAppDigits(brand.primaryPhone);
-    const confirmations = [
-      confirmCalloutFee && '- Call-out / diagnostic fee before dispatch',
-      confirmWarranty && '- Manufacturer vs. workmanship warranty terms',
-      confirmScope && '- Itemized scope of work & lead time',
-    ]
-      .filter(Boolean)
-      .join('\n');
 
     const lines = [
       `Hello ${brand.companyName},`,
@@ -89,7 +79,6 @@ export function QuoteSection({
       '',
       '*Project / Fault Details:*',
       details.trim() || buildPrefilledDetails(activeServiceTitle, requestType, propertyType),
-      confirmations ? `\n*Upfront Confirmations Requested:*\n${confirmations}` : '',
     ].filter((line, idx, arr) => !(line === '' && arr[idx - 1] === ''));
 
     return `https://wa.me/${waDigits}?text=${encodeURIComponent(lines.join('\n'))}`;
@@ -139,9 +128,6 @@ export function QuoteSection({
           requestType,
           serviceId: selectedServiceId,
           serviceTitle: activeServiceTitle,
-          confirmCalloutFee,
-          confirmWarranty,
-          confirmScope,
           details: finalDetails,
         }),
       });
@@ -169,7 +155,7 @@ export function QuoteSection({
           {/* Left Column: Cape Town Locations, Direct Phones & Transparency */}
           <div className="lg:col-span-5 space-y-8">
             <div>
-              <p className="text-xs font-medium text-amber-700 tracking-wide mb-2">
+              <p className="text-sm sm:text-base font-semibold text-amber-700 tracking-wide mb-2">
                 {brand.contactPageEyebrow}
               </p>
               <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 text-balance">
@@ -274,24 +260,6 @@ export function QuoteSection({
                 </div>
               </div>
             </div>
-
-            {/* Upfront Scope, Warranty & Public Listing Transparency Box */}
-            <div className="group rounded-xl border border-slate-200 bg-slate-50 p-5">
-              <div className="flex items-start gap-3">
-                <ShieldAlert
-                  className="w-5 h-5 text-amber-700 mt-0.5 shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
-                  aria-hidden="true"
-                />
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Confirm Scope, Warranty &amp; Call-Out Fees Upfront
-                  </h3>
-                  <p className="mt-1.5 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                    {brand.transparencyNote}
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Right Column: Interactive Quote & Repair Request Form */}
@@ -302,7 +270,7 @@ export function QuoteSection({
                   Request a Site Quote or Repair Assessment
                 </h3>
                 <p className="mt-1 text-sm text-slate-600">
-                  Send your property details and upfront confirmation questions directly to our dispatch desk.
+                  Send your property details directly to our dispatch desk.
                 </p>
               </div>
 
@@ -517,40 +485,6 @@ export function QuoteSection({
                       placeholder="Describe gate motor model, fence length, number of cameras, or fault symptoms..."
                       className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600"
                     />
-                  </div>
-
-                  {/* Pre-dispatch clarity checkboxes */}
-                  <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-2.5">
-                    <p className="text-xs font-semibold text-slate-800">
-                      Include Written Confirmation Requests:
-                    </p>
-                    <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={confirmCalloutFee}
-                        onChange={(e) => setConfirmCalloutFee(e.target.checked)}
-                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-600"
-                      />
-                      Confirm call-out / diagnostic fee before technician dispatch
-                    </label>
-                    <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={confirmWarranty}
-                        onChange={(e) => setConfirmWarranty(e.target.checked)}
-                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-600"
-                      />
-                      Confirm manufacturer vs. workmanship warranty terms
-                    </label>
-                    <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={confirmScope}
-                        onChange={(e) => setConfirmScope(e.target.checked)}
-                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-600"
-                      />
-                      Provide itemized scope of work and lead time upfront
-                    </label>
                   </div>
 
                   {submitError && (

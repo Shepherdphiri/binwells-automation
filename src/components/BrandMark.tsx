@@ -6,7 +6,7 @@ interface BrandMarkProps {
   sizeClass?: string;
 }
 
-export function BrandMark({logoUrl, companyName, sizeClass = 'w-8 h-8'}: BrandMarkProps) {
+export function BrandMark({logoUrl, companyName, sizeClass = 'w-11 h-11'}: BrandMarkProps) {
   const [imgFailed, setImgFailed] = useState(false);
 
   useEffect(() => {

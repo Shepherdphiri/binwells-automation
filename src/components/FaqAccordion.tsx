@@ -41,7 +41,7 @@ export function FaqAccordion({faqs, onRequestQuote, focusedFaqId}: FaqAccordionP
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         {/* Left Sticky Intro */}
         <div className="lg:col-span-4 space-y-4">
-          <p className="text-xs font-medium text-amber-700 tracking-wide">
+          <p className="text-sm sm:text-base font-semibold text-amber-700 tracking-wide">
             Frequently Asked Questions
           </p>
           <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 text-balance">

@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Jost", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Jost", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Jost", ui-sans-serif, system-ui, sans-serif;
   --text-xs: 0.875rem;
   --text-xs--line-height: 1.35rem;
   --text-sm: 1rem;
@@ -21,7 +21,7 @@
 }
 
 @layer base {
-  html {
+  html, body {
     scroll-behavior: smooth;
     font-family: var(--font-sans);
   }
