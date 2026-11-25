@@ -121,4 +121,5 @@ export interface AdminStatus {
   envOverride: boolean;
   authenticated: boolean;
   smtpConfigured: boolean;
+  storageMode: 'postgres' | 'local';
 }

@@ -914,6 +914,25 @@ export function AdminConsole({
             <span className="text-xs text-slate-500 font-mono tabular-nums">
               {siteState.connectedClients} live client{siteState.connectedClients === 1 ? '' : 's'}
             </span>
+            {adminStatus && (
+              <>
+                <span className="text-slate-300" aria-hidden="true">·</span>
+                <span
+                  className={`text-xs font-medium ${
+                    adminStatus.storageMode === 'postgres' ? 'text-emerald-700' : 'text-amber-700'
+                  }`}
+                  title={
+                    adminStatus.storageMode === 'postgres'
+                      ? 'Changes and uploaded images persist permanently in PostgreSQL.'
+                      : 'Running on local file fallback. Add DATABASE_URL in Render to persist edits across restarts.'
+                  }
+                >
+                  {adminStatus.storageMode === 'postgres'
+                    ? 'PostgreSQL Persistent'
+                    : 'Local Fallback (Set DATABASE_URL on Render)'}
+                </span>
+              </>
+            )}
           </div>
 
           <button

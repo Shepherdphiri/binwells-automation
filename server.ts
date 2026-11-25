@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -6,6 +7,18 @@ import express, {NextFunction, Request, Response} from 'express';
 import nodemailer from 'nodemailer';
 import {createServer as createViteServer} from 'vite';
 import {WebSocket, WebSocketServer} from 'ws';
+import {
+  type AdminCredential,
+  type PersistedStore,
+  createAdminSession,
+  getMediaFile,
+  getStorageMode,
+  initStorage,
+  revokeAdminSession,
+  saveMediaFile,
+  saveStore,
+  validateAdminSession,
+} from './src/server/storage.ts';
 import type {
   BrandSettings,
   FaqItem,
@@ -27,22 +40,6 @@ const STORE_PATH = path.resolve(DATA_DIR, 'store.json');
 
 fs.mkdirSync(DATA_DIR, {recursive: true});
 fs.mkdirSync(UPLOADS_DIR, {recursive: true});
-
-interface AdminCredential {
-  salt: string;
-  hash: string;
-  claimedAt: string;
-}
-
-interface PersistedStore {
-  brand: BrandSettings;
-  services: ServiceItem[];
-  news: NewsItem[];
-  gallery: GalleryImage[];
-  faqs: FaqItem[];
-  inquiries: QuoteInquiry[];
-  adminCredential: AdminCredential | null;
-}
 
 function createInitialStore(): PersistedStore {
   const now = new Date().toISOString();
@@ -330,101 +327,52 @@ function createInitialStore(): PersistedStore {
   };
 }
 
-function loadStore(): PersistedStore {
-  try {
-    if (fs.existsSync(STORE_PATH)) {
-      const raw = fs.readFileSync(STORE_PATH, 'utf8');
-      const parsed = JSON.parse(raw) as Partial<PersistedStore>;
-      const defaults = createInitialStore();
-      const parsedBrand = (parsed.brand || {}) as Partial<BrandSettings>;
-      const mergedBrand: BrandSettings = {...defaults.brand, ...parsedBrand};
-      if (!Array.isArray(parsedBrand.heroImages) || parsedBrand.heroImages.length === 0) {
-        const primary = mergedBrand.heroImageUrl || defaults.brand.heroImageUrl;
-        mergedBrand.heroImages = Array.from(new Set([primary, ...defaults.brand.heroImages])).slice(0, 4);
-      }
-      if (typeof parsedBrand.heroImageOpacity !== 'number' || !Number.isFinite(parsedBrand.heroImageOpacity)) {
-        mergedBrand.heroImageOpacity = defaults.brand.heroImageOpacity;
-      }
-      if (mergedBrand.bishopscourtAddress?.toLowerCase().includes('112 rhodes')) {
-        mergedBrand.bishopscourtAddress = '';
-      }
-      if (mergedBrand.secondaryPhone?.includes('936') || mergedBrand.secondaryPhone?.includes('4009')) {
-        mergedBrand.secondaryPhone = '';
-      }
-      if (mergedBrand.contactPageTitle?.toLowerCase().includes('bishopscourt')) {
-        mergedBrand.contactPageTitle = '';
-      }
-      if (Array.isArray(mergedBrand.aboutPillars)) {
-        mergedBrand.aboutPillars = mergedBrand.aboutPillars.map((pillar) => ({
-          ...pillar,
-          description: pillar.description.includes('112 Rhodes')
-            ? 'Based at 19 Auriga Rd, Retreat — roughly 15 minutes south of the Foreshore/CBD, serving greater Cape Town.'
-            : pillar.description,
-        }));
-      }
-      const nextFaqs = (Array.isArray(parsed.faqs) ? parsed.faqs : defaults.faqs).map((faq) => ({
-        ...faq,
-        answer: faq.answer.includes('112 Rhodes')
-          ? 'Binwells Automation and Security Services serves residential homes, estates, commercial offices, and industrial facilities across Cape Town from 19 Auriga Rd, Retreat (roughly 15 minutes south of the Foreshore/CBD depending on traffic), covering Southern Suburbs, Bishopscourt, Constantia, and greater Cape Town.'
-          : faq.answer,
-      }));
-      return {
-        brand: mergedBrand,
-        services: Array.isArray(parsed.services) ? parsed.services : defaults.services,
-        news: Array.isArray(parsed.news) ? parsed.news : defaults.news,
-        gallery: Array.isArray(parsed.gallery) ? parsed.gallery : defaults.gallery,
-        faqs: nextFaqs,
-        inquiries: Array.isArray(parsed.inquiries) ? parsed.inquiries : [],
-        adminCredential: parsed.adminCredential ?? null,
-      };
-    }
-  } catch (err) {
-    console.error('Failed to read store.json, recreating initial store:', err);
+function normalizeStore(parsed: Partial<PersistedStore>): PersistedStore {
+  const defaults = createInitialStore();
+  const parsedBrand = (parsed.brand || {}) as Partial<BrandSettings>;
+  const mergedBrand: BrandSettings = {...defaults.brand, ...parsedBrand};
+  if (!Array.isArray(parsedBrand.heroImages) || parsedBrand.heroImages.length === 0) {
+    const primary = mergedBrand.heroImageUrl || defaults.brand.heroImageUrl;
+    mergedBrand.heroImages = Array.from(new Set([primary, ...defaults.brand.heroImages])).slice(0, 4);
   }
-  const initial = createInitialStore();
-  saveStore(initial);
-  return initial;
-}
-
-function saveStore(nextStore: PersistedStore): void {
-  const tmpPath = `${STORE_PATH}.tmp`;
-  fs.writeFileSync(tmpPath, JSON.stringify(nextStore, null, 2), 'utf8');
-  fs.renameSync(tmpPath, STORE_PATH);
-}
-
-let store = loadStore();
-
-// Session tokens held in server memory
-const activeSessions = new Map<string, number>();
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-
-function cleanupExpiredSessions(): void {
-  const now = Date.now();
-  for (const [token, expiresAt] of activeSessions.entries()) {
-    if (expiresAt <= now) {
-      activeSessions.delete(token);
-    }
+  if (typeof parsedBrand.heroImageOpacity !== 'number' || !Number.isFinite(parsedBrand.heroImageOpacity)) {
+    mergedBrand.heroImageOpacity = defaults.brand.heroImageOpacity;
   }
-}
-
-function createSessionToken(): string {
-  cleanupExpiredSessions();
-  const token = crypto.randomBytes(32).toString('hex');
-  activeSessions.set(token, Date.now() + SESSION_TTL_MS);
-  return token;
-}
-
-function isValidSessionToken(token: string | undefined): boolean {
-  if (!token) return false;
-  cleanupExpiredSessions();
-  const expiresAt = activeSessions.get(token);
-  if (!expiresAt) return false;
-  if (expiresAt <= Date.now()) {
-    activeSessions.delete(token);
-    return false;
+  if (mergedBrand.bishopscourtAddress?.toLowerCase().includes('112 rhodes')) {
+    mergedBrand.bishopscourtAddress = '';
   }
-  return true;
+  if (mergedBrand.secondaryPhone?.includes('936') || mergedBrand.secondaryPhone?.includes('4009')) {
+    mergedBrand.secondaryPhone = '';
+  }
+  if (mergedBrand.contactPageTitle?.toLowerCase().includes('bishopscourt')) {
+    mergedBrand.contactPageTitle = '';
+  }
+  if (Array.isArray(mergedBrand.aboutPillars)) {
+    mergedBrand.aboutPillars = mergedBrand.aboutPillars.map((pillar) => ({
+      ...pillar,
+      description: pillar.description.includes('112 Rhodes')
+        ? 'Based at 19 Auriga Rd, Retreat — roughly 15 minutes south of the Foreshore/CBD, serving greater Cape Town.'
+        : pillar.description,
+    }));
+  }
+  const nextFaqs = (Array.isArray(parsed.faqs) ? parsed.faqs : defaults.faqs).map((faq) => ({
+    ...faq,
+    answer: faq.answer.includes('112 Rhodes')
+      ? 'Binwells Automation and Security Services serves residential homes, estates, commercial offices, and industrial facilities across Cape Town from 19 Auriga Rd, Retreat (roughly 15 minutes south of the Foreshore/CBD depending on traffic), covering Southern Suburbs, Bishopscourt, Constantia, and greater Cape Town.'
+      : faq.answer,
+  }));
+  return {
+    brand: mergedBrand,
+    services: Array.isArray(parsed.services) ? parsed.services : defaults.services,
+    news: Array.isArray(parsed.news) ? parsed.news : defaults.news,
+    gallery: Array.isArray(parsed.gallery) ? parsed.gallery : defaults.gallery,
+    faqs: nextFaqs,
+    inquiries: Array.isArray(parsed.inquiries) ? parsed.inquiries : [],
+    adminCredential: parsed.adminCredential ?? null,
+  };
 }
+
+let store: PersistedStore = createInitialStore();
 
 function hashPassword(password: string, salt?: string): {salt: string; hash: string} {
   const usedSalt = salt || crypto.randomBytes(16).toString('hex');
@@ -460,13 +408,18 @@ function extractBearerToken(req: Request): string | undefined {
   return header.slice(7).trim();
 }
 
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const token = extractBearerToken(req);
-  if (!isValidSessionToken(token)) {
-    res.status(401).json({error: 'Admin authentication required.'});
-    return;
+async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const token = extractBearerToken(req);
+    if (!(await validateAdminSession(token))) {
+      res.status(401).json({error: 'Admin authentication required.'});
+      return;
+    }
+    next();
+  } catch (err) {
+    console.error('Admin session verification error:', err);
+    res.status(500).json({error: 'Could not verify admin session.'});
   }
-  next();
 }
 
 function sanitizeText(value: unknown, maxLen: number): string {
@@ -522,6 +475,7 @@ function detectImageType(buffer: Buffer): {ext: string; mime: string} | null {
 }
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json({limit: '5mb'}));
 
 // Prevent proxy/browser caching on dynamic API routes so image & copy updates sync immediately
@@ -532,18 +486,24 @@ app.use('/api', (_req, res, next) => {
   next();
 });
 
-// Serve uploaded UUID images safely with immutable browser caching
-app.use(
-  '/uploads',
-  express.static(UPLOADS_DIR, {
-    fallthrough: true,
-    maxAge: '365d',
-    immutable: true,
-    setHeaders: (res) => {
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-    },
-  }),
-);
+// Serve uploaded UUID images from PostgreSQL (when connected) or local disk with immutable caching
+app.get('/uploads/:filename', async (req, res) => {
+  try {
+    const filename = sanitizeText(req.params.filename, 120);
+    const media = await getMediaFile(filename);
+    if (!media) {
+      res.status(404).end();
+      return;
+    }
+    res.setHeader('Content-Type', media.mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(media.data);
+  } catch (err) {
+    console.error('Failed to serve uploaded media:', err);
+    res.status(500).end();
+  }
+});
 
 // Email helper (optional SMTP via environment variables)
 function escapeHtml(input: string): string {
@@ -661,11 +621,11 @@ wss.on('connection', (socket) => {
   socket.send(JSON.stringify({event: 'state:init', payload: getPublicState()}));
   broadcastPublic('clients:count', {connectedClients: wss.clients.size});
 
-  socket.on('message', (raw) => {
+  socket.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw.toString()) as {type?: string; token?: string};
       if (msg.type === 'admin:auth' && typeof msg.token === 'string') {
-        if (isValidSessionToken(msg.token)) {
+        if (await validateAdminSession(msg.token)) {
           adminSockets.add(socket);
           socket.send(JSON.stringify({event: 'admin:authed', payload: {ok: true}}));
         } else {
@@ -693,7 +653,7 @@ app.get('/api/state', (_req, res) => {
 });
 
 // Public quote/service inquiry submission
-app.post('/api/inquiries', (req, res) => {
+app.post('/api/inquiries', async (req, res) => {
   const body = req.body as Record<string, unknown>;
   const name = sanitizeText(body.name, 100);
   const phone = sanitizeText(body.phone, 40);
@@ -745,8 +705,15 @@ app.post('/api/inquiries', (req, res) => {
     createdAt: new Date().toISOString(),
   };
 
-  store.inquiries = [inquiry, ...store.inquiries].slice(0, 200);
-  saveStore(store);
+  const nextInquiries = [inquiry, ...store.inquiries].slice(0, 200);
+  try {
+    await saveStore({...store, inquiries: nextInquiries});
+    store.inquiries = nextInquiries;
+  } catch (err) {
+    console.error('Failed to persist inquiry:', err);
+    res.status(500).json({error: 'Could not save inquiry to database. Please try again.'});
+    return;
+  }
 
   broadcastAdmins('admin:inquiry_created', inquiry);
 
@@ -796,14 +763,20 @@ app.post('/api/inquiries', (req, res) => {
 });
 
 // Admin auth status
-app.get('/api/admin/status', (req, res) => {
-  const token = extractBearerToken(req);
-  res.json({
-    configured: isAdminConfigured(),
-    envOverride: Boolean(getEnvPasscode()),
-    authenticated: isValidSessionToken(token),
-    smtpConfigured: isSmtpConfigured(),
-  });
+app.get('/api/admin/status', async (req, res) => {
+  try {
+    const token = extractBearerToken(req);
+    res.json({
+      configured: isAdminConfigured(),
+      envOverride: Boolean(getEnvPasscode()),
+      authenticated: await validateAdminSession(token),
+      smtpConfigured: isSmtpConfigured(),
+      storageMode: getStorageMode(),
+    });
+  } catch (err) {
+    console.error('Failed to check admin status:', err);
+    res.status(500).json({error: 'Could not check admin status.'});
+  }
 });
 
 // Protected: Test domain email SMTP delivery
@@ -835,7 +808,7 @@ app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
 });
 
 // First-run admin claim (only when no env passcode and no stored credential exist)
-app.post('/api/admin/claim', (req, res) => {
+app.post('/api/admin/claim', async (req, res) => {
   if (getEnvPasscode()) {
     res.status(409).json({error: 'Admin passcode is managed by server environment configuration.'});
     return;
@@ -851,19 +824,25 @@ app.post('/api/admin/claim', (req, res) => {
   }
 
   const {salt, hash} = hashPassword(password);
-  store.adminCredential = {
+  const credential: AdminCredential = {
     salt,
     hash,
     claimedAt: new Date().toISOString(),
   };
-  saveStore(store);
 
-  const token = createSessionToken();
-  res.status(201).json({token});
+  try {
+    await saveStore({...store, adminCredential: credential});
+    store.adminCredential = credential;
+    const token = await createAdminSession();
+    res.status(201).json({token});
+  } catch (err) {
+    console.error('Failed to claim admin passcode:', err);
+    res.status(500).json({error: 'Could not save admin passcode to database.'});
+  }
 });
 
 // Admin login
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', async (req, res) => {
   const password = typeof req.body?.password === 'string' ? req.body.password.trim() : '';
   if (!password) {
     res.status(400).json({error: 'Passcode is required.'});
@@ -886,18 +865,25 @@ app.post('/api/admin/login', (req, res) => {
     return;
   }
 
-  const token = createSessionToken();
-  res.json({token});
+  try {
+    const token = await createAdminSession();
+    res.json({token});
+  } catch (err) {
+    console.error('Failed to create admin session:', err);
+    res.status(500).json({error: 'Could not start admin session.'});
+  }
 });
 
-app.post('/api/admin/logout', (req, res) => {
+app.post('/api/admin/logout', async (req, res) => {
   const token = extractBearerToken(req);
-  if (token) activeSessions.delete(token);
+  if (token) {
+    await revokeAdminSession(token);
+  }
   res.json({ok: true});
 });
 
 // Protected: Upload image (PNG, JPEG, WEBP up to 3MB)
-app.post('/api/admin/upload', requireAdmin, (req, res) => {
+app.post('/api/admin/upload', requireAdmin, async (req, res) => {
   const dataBase64 = typeof req.body?.dataBase64 === 'string' ? req.body.dataBase64 : '';
   const title = sanitizeText(req.body?.title, 100);
   const category = sanitizeText(req.body?.category, 60) || 'Site Media';
@@ -924,35 +910,36 @@ app.post('/api/admin/upload', requireAdmin, (req, res) => {
   }
 
   const safeFilename = `${crypto.randomUUID()}${detected.ext}`;
-  const targetPath = path.resolve(UPLOADS_DIR, safeFilename);
-  if (!targetPath.startsWith(UPLOADS_DIR + path.sep)) {
-    res.status(400).json({error: 'Invalid upload destination.'});
-    return;
-  }
-
-  fs.writeFileSync(targetPath, buffer);
   const publicUrl = `/uploads/${safeFilename}`;
 
-  let galleryEntry: GalleryImage | null = null;
-  if (addToGallery) {
-    galleryEntry = {
-      id: `gal-${crypto.randomUUID().slice(0, 8)}`,
-      title: title || 'Uploaded Site Image',
-      category,
-      url: publicUrl,
-      caption: caption || 'Uploaded via Binwells Admin Console.',
-      uploadedAt: new Date().toISOString(),
-    };
-    store.gallery = [galleryEntry, ...store.gallery];
-    saveStore(store);
-    broadcastPublic('gallery:updated', getPublicState().gallery);
-  }
+  try {
+    await saveMediaFile(safeFilename, detected.mime, buffer);
 
-  res.status(201).json({url: publicUrl, galleryEntry});
+    let galleryEntry: GalleryImage | null = null;
+    if (addToGallery) {
+      galleryEntry = {
+        id: `gal-${crypto.randomUUID().slice(0, 8)}`,
+        title: title || 'Uploaded Site Image',
+        category,
+        url: publicUrl,
+        caption: caption || 'Uploaded via Binwells Admin Console.',
+        uploadedAt: new Date().toISOString(),
+      };
+      const nextGallery = [galleryEntry, ...store.gallery];
+      await saveStore({...store, gallery: nextGallery});
+      store.gallery = nextGallery;
+      broadcastPublic('gallery:updated', getPublicState().gallery);
+    }
+
+    res.status(201).json({url: publicUrl, galleryEntry});
+  } catch (err) {
+    console.error('Failed to persist uploaded media:', err);
+    res.status(500).json({error: 'Could not save uploaded image to database.'});
+  }
 });
 
 // Protected: Brand & Logo updates
-app.put('/api/admin/brand', requireAdmin, (req, res) => {
+app.put('/api/admin/brand', requireAdmin, async (req, res) => {
   const b = req.body as Record<string, unknown>;
   const heroImageUrl = sanitizeText(b.heroImageUrl, 300);
   const logoUrl = sanitizeText(b.logoUrl, 300);
@@ -1056,14 +1043,19 @@ app.put('/api/admin/brand', requireAdmin, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
 
-  store.brand = updated;
-  saveStore(store);
-  broadcastPublic('brand:updated', updated);
-  res.json(updated);
+  try {
+    await saveStore({...store, brand: updated});
+    store.brand = updated;
+    broadcastPublic('brand:updated', updated);
+    res.json(updated);
+  } catch (err) {
+    console.error('Failed to save brand settings:', err);
+    res.status(500).json({error: 'Could not save brand settings to database.'});
+  }
 });
 
 // Protected: Services CRUD
-app.post('/api/admin/services', requireAdmin, (req, res) => {
+app.post('/api/admin/services', requireAdmin, async (req, res) => {
   const b = req.body as Record<string, unknown>;
   const title = sanitizeText(b.title, 100);
   const category = sanitizeText(b.category, 60) || 'Security';
@@ -1098,14 +1090,20 @@ app.post('/api/admin/services', requireAdmin, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
 
-  store.services = [...store.services, created];
-  saveStore(store);
-  const sorted = getPublicState().services;
-  broadcastPublic('services:updated', sorted);
-  res.status(201).json(created);
+  const nextServices = [...store.services, created];
+  try {
+    await saveStore({...store, services: nextServices});
+    store.services = nextServices;
+    const sorted = getPublicState().services;
+    broadcastPublic('services:updated', sorted);
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('Failed to save new service:', err);
+    res.status(500).json({error: 'Could not save service to database.'});
+  }
 });
 
-app.put('/api/admin/services/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/services/:id', requireAdmin, async (req, res) => {
   const id = sanitizeText(req.params.id, 60);
   const idx = store.services.findIndex((s) => s.id === id);
   if (idx === -1) {
@@ -1140,29 +1138,40 @@ app.put('/api/admin/services/:id', requireAdmin, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
 
-  store.services[idx] = updated;
-  saveStore(store);
-  const sorted = getPublicState().services;
-  broadcastPublic('services:updated', sorted);
-  res.json(updated);
+  const nextServices = store.services.map((s, i) => (i === idx ? updated : s));
+  try {
+    await saveStore({...store, services: nextServices});
+    store.services = nextServices;
+    const sorted = getPublicState().services;
+    broadcastPublic('services:updated', sorted);
+    res.json(updated);
+  } catch (err) {
+    console.error('Failed to update service:', err);
+    res.status(500).json({error: 'Could not update service in database.'});
+  }
 });
 
-app.delete('/api/admin/services/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/services/:id', requireAdmin, async (req, res) => {
   const id = sanitizeText(req.params.id, 60);
-  const prevLen = store.services.length;
-  store.services = store.services.filter((s) => s.id !== id);
-  if (store.services.length === prevLen) {
+  const nextServices = store.services.filter((s) => s.id !== id);
+  if (nextServices.length === store.services.length) {
     res.status(404).json({error: 'Service not found.'});
     return;
   }
-  saveStore(store);
-  const sorted = getPublicState().services;
-  broadcastPublic('services:updated', sorted);
-  res.json({ok: true});
+  try {
+    await saveStore({...store, services: nextServices});
+    store.services = nextServices;
+    const sorted = getPublicState().services;
+    broadcastPublic('services:updated', sorted);
+    res.json({ok: true});
+  } catch (err) {
+    console.error('Failed to delete service:', err);
+    res.status(500).json({error: 'Could not delete service from database.'});
+  }
 });
 
 // Protected: Live News Feed CRUD
-app.post('/api/admin/news', requireAdmin, (req, res) => {
+app.post('/api/admin/news', requireAdmin, async (req, res) => {
   const b = req.body as Record<string, unknown>;
   const title = sanitizeText(b.title, 140);
   const category = VALID_NEWS_CATEGORIES.includes(b.category as NewsCategory)
@@ -1192,13 +1201,19 @@ app.post('/api/admin/news', requireAdmin, (req, res) => {
     publishedAt: new Date().toISOString(),
   };
 
-  store.news = [item, ...store.news].slice(0, 60);
-  saveStore(store);
-  broadcastPublic('news:created', item);
-  res.status(201).json(item);
+  const nextNews = [item, ...store.news].slice(0, 60);
+  try {
+    await saveStore({...store, news: nextNews});
+    store.news = nextNews;
+    broadcastPublic('news:created', item);
+    res.status(201).json(item);
+  } catch (err) {
+    console.error('Failed to save news post:', err);
+    res.status(500).json({error: 'Could not save news post to database.'});
+  }
 });
 
-app.put('/api/admin/news/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/news/:id', requireAdmin, async (req, res) => {
   const id = sanitizeText(req.params.id, 60);
   const idx = store.news.findIndex((n) => n.id === id);
   if (idx === -1) {
@@ -1226,27 +1241,38 @@ app.put('/api/admin/news/:id', requireAdmin, (req, res) => {
     pinned: typeof b.pinned === 'boolean' ? b.pinned : existing.pinned,
   };
 
-  store.news[idx] = updated;
-  saveStore(store);
-  broadcastPublic('news:updated', updated);
-  res.json(updated);
+  const nextNews = store.news.map((n, i) => (i === idx ? updated : n));
+  try {
+    await saveStore({...store, news: nextNews});
+    store.news = nextNews;
+    broadcastPublic('news:updated', updated);
+    res.json(updated);
+  } catch (err) {
+    console.error('Failed to update news post:', err);
+    res.status(500).json({error: 'Could not update news post in database.'});
+  }
 });
 
-app.delete('/api/admin/news/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/news/:id', requireAdmin, async (req, res) => {
   const id = sanitizeText(req.params.id, 60);
-  const prevLen = store.news.length;
-  store.news = store.news.filter((n) => n.id !== id);
-  if (store.news.length === prevLen) {
+  const nextNews = store.news.filter((n) => n.id !== id);
+  if (nextNews.length === store.news.length) {
     res.status(404).json({error: 'News item not found.'});
     return;
   }
-  saveStore(store);
-  broadcastPublic('news:deleted', {id});
-  res.json({ok: true});
+  try {
+    await saveStore({...store, news: nextNews});
+    store.news = nextNews;
+    broadcastPublic('news:deleted', {id});
+    res.json({ok: true});
+  } catch (err) {
+    console.error('Failed to delete news post:', err);
+    res.status(500).json({error: 'Could not delete news post from database.'});
+  }
 });
 
 // Protected: Gallery CRUD
-app.post('/api/admin/gallery', requireAdmin, (req, res) => {
+app.post('/api/admin/gallery', requireAdmin, async (req, res) => {
   const b = req.body as Record<string, unknown>;
   const title = sanitizeText(b.title, 100);
   const category = sanitizeText(b.category, 60) || 'Installations';
@@ -1267,27 +1293,38 @@ app.post('/api/admin/gallery', requireAdmin, (req, res) => {
     uploadedAt: new Date().toISOString(),
   };
 
-  store.gallery = [item, ...store.gallery];
-  saveStore(store);
-  broadcastPublic('gallery:updated', getPublicState().gallery);
-  res.status(201).json(item);
+  const nextGallery = [item, ...store.gallery];
+  try {
+    await saveStore({...store, gallery: nextGallery});
+    store.gallery = nextGallery;
+    broadcastPublic('gallery:updated', getPublicState().gallery);
+    res.status(201).json(item);
+  } catch (err) {
+    console.error('Failed to save gallery image:', err);
+    res.status(500).json({error: 'Could not save gallery image to database.'});
+  }
 });
 
-app.delete('/api/admin/gallery/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/gallery/:id', requireAdmin, async (req, res) => {
   const id = sanitizeText(req.params.id, 60);
-  const prevLen = store.gallery.length;
-  store.gallery = store.gallery.filter((g) => g.id !== id);
-  if (store.gallery.length === prevLen) {
+  const nextGallery = store.gallery.filter((g) => g.id !== id);
+  if (nextGallery.length === store.gallery.length) {
     res.status(404).json({error: 'Gallery image not found.'});
     return;
   }
-  saveStore(store);
-  broadcastPublic('gallery:updated', getPublicState().gallery);
-  res.json({ok: true});
+  try {
+    await saveStore({...store, gallery: nextGallery});
+    store.gallery = nextGallery;
+    broadcastPublic('gallery:updated', getPublicState().gallery);
+    res.json({ok: true});
+  } catch (err) {
+    console.error('Failed to delete gallery image:', err);
+    res.status(500).json({error: 'Could not delete gallery image from database.'});
+  }
 });
 
 // Protected: FAQs CRUD
-app.post('/api/admin/faqs', requireAdmin, (req, res) => {
+app.post('/api/admin/faqs', requireAdmin, async (req, res) => {
   const b = req.body as Record<string, unknown>;
   const category = sanitizeText(b.category, 60) || 'General';
   const question = sanitizeText(b.question, 220);
@@ -1308,14 +1345,20 @@ app.post('/api/admin/faqs', requireAdmin, (req, res) => {
     active: b.active !== false,
   };
 
-  store.faqs = [...store.faqs, created];
-  saveStore(store);
-  const sorted = getPublicState().faqs;
-  broadcastPublic('faqs:updated', sorted);
-  res.status(201).json(created);
+  const nextFaqs = [...store.faqs, created];
+  try {
+    await saveStore({...store, faqs: nextFaqs});
+    store.faqs = nextFaqs;
+    const sorted = getPublicState().faqs;
+    broadcastPublic('faqs:updated', sorted);
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('Failed to save FAQ:', err);
+    res.status(500).json({error: 'Could not save FAQ to database.'});
+  }
 });
 
-app.put('/api/admin/faqs/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/faqs/:id', requireAdmin, async (req, res) => {
   const id = sanitizeText(req.params.id, 60);
   const idx = store.faqs.findIndex((f) => f.id === id);
   if (idx === -1) {
@@ -1334,25 +1377,36 @@ app.put('/api/admin/faqs/:id', requireAdmin, (req, res) => {
     active: typeof b.active === 'boolean' ? b.active : existing.active,
   };
 
-  store.faqs[idx] = updated;
-  saveStore(store);
-  const sorted = getPublicState().faqs;
-  broadcastPublic('faqs:updated', sorted);
-  res.json(updated);
+  const nextFaqs = store.faqs.map((f, i) => (i === idx ? updated : f));
+  try {
+    await saveStore({...store, faqs: nextFaqs});
+    store.faqs = nextFaqs;
+    const sorted = getPublicState().faqs;
+    broadcastPublic('faqs:updated', sorted);
+    res.json(updated);
+  } catch (err) {
+    console.error('Failed to update FAQ:', err);
+    res.status(500).json({error: 'Could not update FAQ in database.'});
+  }
 });
 
-app.delete('/api/admin/faqs/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/faqs/:id', requireAdmin, async (req, res) => {
   const id = sanitizeText(req.params.id, 60);
-  const prevLen = store.faqs.length;
-  store.faqs = store.faqs.filter((f) => f.id !== id);
-  if (store.faqs.length === prevLen) {
+  const nextFaqs = store.faqs.filter((f) => f.id !== id);
+  if (nextFaqs.length === store.faqs.length) {
     res.status(404).json({error: 'FAQ not found.'});
     return;
   }
-  saveStore(store);
-  const sorted = getPublicState().faqs;
-  broadcastPublic('faqs:updated', sorted);
-  res.json({ok: true});
+  try {
+    await saveStore({...store, faqs: nextFaqs});
+    store.faqs = nextFaqs;
+    const sorted = getPublicState().faqs;
+    broadcastPublic('faqs:updated', sorted);
+    res.json({ok: true});
+  } catch (err) {
+    console.error('Failed to delete FAQ:', err);
+    res.status(500).json({error: 'Could not delete FAQ from database.'});
+  }
 });
 
 // Protected: Customer Inquiries queue
@@ -1360,7 +1414,7 @@ app.get('/api/admin/inquiries', requireAdmin, (_req, res) => {
   res.json(store.inquiries);
 });
 
-app.patch('/api/admin/inquiries/:id', requireAdmin, (req, res) => {
+app.patch('/api/admin/inquiries/:id', requireAdmin, async (req, res) => {
   const id = sanitizeText(req.params.id, 60);
   const idx = store.inquiries.findIndex((i) => i.id === id);
   if (idx === -1) {
@@ -1372,19 +1426,40 @@ app.patch('/api/admin/inquiries/:id', requireAdmin, (req, res) => {
     res.status(400).json({error: 'Invalid inquiry status.'});
     return;
   }
-  store.inquiries[idx] = {...store.inquiries[idx], status};
-  saveStore(store);
-  res.json(store.inquiries[idx]);
+  const updated = {...store.inquiries[idx], status};
+  const nextInquiries = store.inquiries.map((inq, i) => (i === idx ? updated : inq));
+  try {
+    await saveStore({...store, inquiries: nextInquiries});
+    store.inquiries = nextInquiries;
+    res.json(updated);
+  } catch (err) {
+    console.error('Failed to update inquiry status:', err);
+    res.status(500).json({error: 'Could not update inquiry in database.'});
+  }
 });
 
-app.delete('/api/admin/inquiries/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/inquiries/:id', requireAdmin, async (req, res) => {
   const id = sanitizeText(req.params.id, 60);
-  store.inquiries = store.inquiries.filter((i) => i.id !== id);
-  saveStore(store);
-  res.json({ok: true});
+  const nextInquiries = store.inquiries.filter((i) => i.id !== id);
+  try {
+    await saveStore({...store, inquiries: nextInquiries});
+    store.inquiries = nextInquiries;
+    res.json({ok: true});
+  } catch (err) {
+    console.error('Failed to delete inquiry:', err);
+    res.status(500).json({error: 'Could not delete inquiry from database.'});
+  }
 });
 
 async function startServer() {
+  store = await initStorage({
+    dataDir: DATA_DIR,
+    uploadsDir: UPLOADS_DIR,
+    storePath: STORE_PATH,
+    createInitialStore,
+    normalizeStore,
+  });
+
   if (!IS_PROD) {
     const vite = await createViteServer({
       server: {middlewareMode: true},
